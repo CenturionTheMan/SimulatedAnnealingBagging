@@ -45,6 +45,7 @@ class BaggingSA:
             print(f"Iteration: {iteration}, Temperature: {T:.4f}, Accuracy: {accuracy:.2f}, New Accuracy: {new_accuracy:.2f}")
             
             if best_accuracy < new_accuracy:
+            if best_accuracy < new_accuracy:
                 best_accuracy = new_accuracy
                 best_models = new_models.copy()
                 
