@@ -37,14 +37,14 @@ class BaggingSA:
         accuracy = get_accuracy(X=self.X_test, y=self.y_test, models=models)
         best_accuracy = accuracy
         
-        while T > 0.001 and iteration < self.max_iterations:
+        while T > 0.00001 and iteration < self.max_iterations:
             bags = [get_neighbor_bag(self.X, self.y, bag) for bag in bags]
             new_models = create_models(bags=bags, n_trees=self.n_trees)
             new_accuracy = get_accuracy(X=self.X_test, y=self.y_test, models=new_models)
             
-            print(f"Iteration: {iteration}, Temperature: {T}, Accuracy: {accuracy}, New Accuracy: {new_accuracy}")
+            print(f"Iteration: {iteration}, Temperature: {T:.3f}, Accuracy: {accuracy:.2f}, New Accuracy: {new_accuracy:.2f}")
             
-            if new_accuracy > best_accuracy:
+            if best_accuracy < new_accuracy:
                 best_accuracy = new_accuracy
                 best_models = new_models.copy()
                 
@@ -53,7 +53,7 @@ class BaggingSA:
                 accuracy = new_accuracy
             else:
                 p = np.exp((accuracy - new_accuracy) / T)
-                if random.random() < p:
+                if random.random() > p:
                     models = new_models.copy()
                     accuracy = new_accuracy
                 
