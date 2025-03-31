@@ -7,44 +7,46 @@ from typing import Tuple
 from dataclasses import dataclass
 from typing import List, Dict, Any
 from BaggingDT import Bag, create_bags, create_models, get_accuracy
+from sklearn.model_selection import train_test_split
 
 
 
 class BaggingSA:
     """docstring for BaggingSA."""
     def __init__(self, 
-                 X: np.ndarray, y: np.ndarray,
+                 X: np.ndarray, y: np.ndarray, bags_with_replacement: bool,
+                 X_test: np.ndarray, y_test: np.ndarray,
                  T0: float, alpha:float, max_iterations: int, n_trees: int
                  ):
+        self.bags_with_replacement = bags_with_replacement
         self.T0 = T0
         self.alpha = alpha
         self.n_trees = n_trees
-        self.X = X
-        self.y = y
+        # self.X, self.X_test, self.y, self.y_test = train_test_split(X, y, test_size=0.2)
+        self.X, self.X_test, self.y, self.y_test = X, X_test, y, y_test
         self.max_iterations = max_iterations
         
         
     def run_simulated_annealing(self) -> List[DecisionTreeClassifier]:
         T = self.T0
         iteration = 0
-        bags = create_bags(X=self.X, y=self.y, n_bags=self.n_trees)
+        bags = create_bags(X=self.X, y=self.y, n_bags=self.n_trees, with_replacement=self.bags_with_replacement)
         models = create_models(bags=bags, n_trees=self.n_trees)
         best_models = models.copy()
         
-        X_test, y_test = get_data_subset(X=self.X, y=self.y)
-        accuracy = get_accuracy(X=X_test, y=y_test, models=models)
+        # X_test, y_test = get_data_subset(X=self.X, y=self.y)
+        accuracy = get_accuracy(X=self.X_test, y=self.y_test, models=models)
         best_accuracy = accuracy
         
         while T > 0.0001 and iteration < self.max_iterations and accuracy < 1.0:
             bags = [get_neighbor_bag(self.X, self.y, bag) for bag in bags]
             new_models = create_models(bags=bags, n_trees=self.n_trees)
             
-            X_test, y_test = get_data_subset(X=self.X, y=self.y)
-            new_accuracy = get_accuracy(X=X_test, y=y_test, models=new_models)
+            # X_test, y_test = get_data_subset(X=self.X, y=self.y)
+            new_accuracy = get_accuracy(X=self.X_test, y=self.y_test, models=new_models)
             
             print(f"Iteration: {iteration}, Temperature: {T:.4f}, Accuracy: {accuracy:.2f}, New Accuracy: {new_accuracy:.2f}")
             
-            if best_accuracy < new_accuracy:
             if best_accuracy < new_accuracy:
                 best_accuracy = new_accuracy
                 best_models = new_models.copy()

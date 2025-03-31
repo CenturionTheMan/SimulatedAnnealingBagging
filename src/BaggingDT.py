@@ -19,9 +19,12 @@ class Bag:
     features: List[int]
 
 
-def create_bag(X, y) -> Bag:
+def create_bag(X, y, with_replacement: bool) -> Bag:
     """Create a bootstrap sample."""
-    indices = np.random.choice(range(len(X)), size=len(X), replace=True)
+    if with_replacement:
+        indices = np.random.choice(range(len(X)), size=len(X), replace=True)
+    else:
+        indices = np.random.choice(range(len(X)), size=len(X/2), replace=False)
     X_sample = X[indices]
     y_sample = y[indices]
     
@@ -36,8 +39,8 @@ def create_bag(X, y) -> Bag:
     return Bag(X_sample, y_sample, random_features)
 
 
-def create_bags(X, y, n_bags: int) -> List[Bag]:
-    return [create_bag(X, y) for _ in range(n_bags)]
+def create_bags(X, y, n_bags: int, with_replacement:bool) -> List[Bag]:
+    return [create_bag(X, y, with_replacement=with_replacement) for _ in range(n_bags)]
     
     
 def predict(X: np.ndarray, models: List[BaggingModel]) -> np.ndarray:
