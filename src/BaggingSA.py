@@ -14,7 +14,6 @@ class BaggingSA:
     """docstring for BaggingSA."""
     def __init__(self, 
                  X: np.ndarray, y: np.ndarray,
-                 X_test: np.ndarray, y_test: np.ndarray, 
                  T0: float, alpha:float, max_iterations: int, n_trees: int
                  ):
         self.T0 = T0
@@ -22,11 +21,8 @@ class BaggingSA:
         self.n_trees = n_trees
         self.X = X
         self.y = y
-        self.X_test = X_test
-        self.y_test = y_test
         self.max_iterations = max_iterations
         
-    
         
     def run_simulated_annealing(self) -> List[DecisionTreeClassifier]:
         T = self.T0
@@ -34,17 +30,21 @@ class BaggingSA:
         bags = create_bags(X=self.X, y=self.y, n_bags=self.n_trees)
         models = create_models(bags=bags, n_trees=self.n_trees)
         best_models = models.copy()
-        accuracy = get_accuracy(X=self.X_test, y=self.y_test, models=models)
+        
+        X_test, y_test = get_data_subset(X=self.X, y=self.y)
+        accuracy = get_accuracy(X=X_test, y=y_test, models=models)
         best_accuracy = accuracy
         
-        while T > 0.001 and iteration < self.max_iterations:
+        while T > 0.0001 and iteration < self.max_iterations and accuracy < 1.0:
             bags = [get_neighbor_bag(self.X, self.y, bag) for bag in bags]
             new_models = create_models(bags=bags, n_trees=self.n_trees)
-            new_accuracy = get_accuracy(X=self.X_test, y=self.y_test, models=new_models)
             
-            print(f"Iteration: {iteration}, Temperature: {T}, Accuracy: {accuracy}, New Accuracy: {new_accuracy}")
+            X_test, y_test = get_data_subset(X=self.X, y=self.y)
+            new_accuracy = get_accuracy(X=X_test, y=y_test, models=new_models)
             
-            if new_accuracy > best_accuracy:
+            print(f"Iteration: {iteration}, Temperature: {T:.4f}, Accuracy: {accuracy:.2f}, New Accuracy: {new_accuracy:.2f}")
+            
+            if best_accuracy < new_accuracy:
                 best_accuracy = new_accuracy
                 best_models = new_models.copy()
                 
@@ -52,27 +52,35 @@ class BaggingSA:
                 models = new_models.copy()
                 accuracy = new_accuracy
             else:
-                p = np.exp((accuracy - new_accuracy) / T)
-                if random.random() < p:
+                threshold = random.uniform(0, 1)
+                prob = np.exp((new_accuracy - accuracy) / T)
+                
+                if prob > threshold:
                     models = new_models.copy()
                     accuracy = new_accuracy
-                
+
             T *= self.alpha
             iteration += 1
         
         return best_models
         
             
+def get_data_subset(X: np.ndarray, y: np.ndarray, sub_size: float = 0.2) -> Tuple[np.ndarray, np.ndarray]:
+    """Get a subset of the data."""
+    if sub_size >= 1:
+        return X, y
+    n_samples = int(len(X) * sub_size)
+    indices = np.random.choice(range(len(X)), size=n_samples, replace=False)
+    return X[indices], y[indices]
 
 def get_neighbor_bag(X, y, bag: Bag) -> Bag:
-        swap_amount = int(len(bag.X) / 100)
-        if swap_amount == 0:
-            swap_amount = 1
-        
+        # swap_amount = int(len(bag.X) / 100)
+        # if swap_amount == 0:
+        #     swap_amount = 1
+        swap_amount = 1
         new_bag = Bag(X=bag.X.copy(), y=bag.y.copy(), features=bag.features.copy())
         
         for _ in range(swap_amount):
-            # Swap a random sample with a random sample from the original data
             swap_index = np.random.randint(0, len(X))
             tmpX = X[swap_index]
             tmpy = y[swap_index]
