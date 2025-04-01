@@ -6,7 +6,7 @@ import random
 from typing import Tuple
 from dataclasses import dataclass
 from typing import List, Dict, Any
-from BaggingDT import Bag, create_bags, create_models, get_accuracy
+from Bagging import Bag, create_bags, create_models, get_accuracy
 from sklearn.model_selection import train_test_split
 
 
