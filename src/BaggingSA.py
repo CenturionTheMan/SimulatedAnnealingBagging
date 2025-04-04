@@ -28,6 +28,9 @@ class BaggingSA:
     def run_simulated_annealing(self) -> List[DecisionTreeClassifier]:
         T = self.T0
         iteration = 0
+        
+        #X_train, X_test, y_train, y_test = train_test_split(self.X, self.y, test_size=0.3)
+        
         bags = create_bags(X=self.X, y=self.y, n_bags=self.n_trees, with_replacement=self.bags_with_replacement)
         models = create_models(bags=bags, n_trees=self.n_trees)
         best_models = models.copy()
