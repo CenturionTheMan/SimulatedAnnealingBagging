@@ -29,21 +29,21 @@ class BaggingSA:
         T = self.T0
         iteration = 0
         
-        #X_train, X_test, y_train, y_test = train_test_split(self.X, self.y, test_size=0.3)
+        X_train, X_test, y_train, y_test = train_test_split(self.X, self.y, test_size=0.3)
         
-        bags = create_bags(X=self.X, y=self.y, n_bags=self.n_trees, with_replacement=self.bags_with_replacement)
+        bags = create_bags(X=X_train, y=y_train, n_bags=self.n_trees, with_replacement=self.bags_with_replacement)
         models = create_models(bags=bags, n_trees=self.n_trees)
         best_models = models.copy()
         
-        X_test, y_test = get_data_subset(X=self.X, y=self.y)
+        #X_test, y_test = get_data_subset(X=self.X, y=self.y)
         accuracy = get_accuracy(X=X_test, y=y_test, models=models)
         best_accuracy = accuracy
         
         while T > 0.0001 and iteration < self.max_iterations and accuracy < 1.0:
-            bags = [get_neighbor_bag(self.X, self.y, bag) for bag in bags]
+            bags = [get_neighbor_bag(X_train, y_train, bag) for bag in bags]
             new_models = create_models(bags=bags, n_trees=self.n_trees)
             
-            X_test, y_test = get_data_subset(X=self.X, y=self.y)
+            #X_test, y_test = get_data_subset(X=self.X, y=self.y)
             new_accuracy = get_accuracy(X=X_test, y=y_test, models=new_models)
             
             print(f"Iteration: {iteration}, Temperature: {T:.4f}, Accuracy: {accuracy:.2f}, New Accuracy: {new_accuracy:.2f}")
@@ -78,10 +78,10 @@ def get_data_subset(X: np.ndarray, y: np.ndarray, sub_size: float = 0.2) -> Tupl
     return X[indices], y[indices]
 
 def get_neighbor_bag(X, y, bag: Bag) -> Bag:
-        # swap_amount = int(len(bag.X) / 100)
-        # if swap_amount == 0:
-        #     swap_amount = 1
-        swap_amount = 1
+    #TODO: check if amout of swap is correct
+        swap_amount = int(len(bag.X) / 1000.0)
+        if swap_amount == 0:
+            swap_amount = 1
         new_bag = Bag(X=bag.X.copy(), y=bag.y.copy(), features=bag.features.copy())
         
         for _ in range(swap_amount):
