@@ -46,7 +46,7 @@ class BaggingSA:
             #X_test, y_test = get_data_subset(X=self.X, y=self.y)
             new_accuracy = get_accuracy(X=X_test, y=y_test, models=new_models)
             
-            print(f"Iteration: {iteration}, Temperature: {T:.4f}, Accuracy: {accuracy:.2f}, New Accuracy: {new_accuracy:.2f}")
+            print(f"Iteration: {iteration}, Temperature: {T:.4f}, Best Accuracy: {best_accuracy:.2f}, Accuracy: {accuracy:.2f}, New Accuracy: {new_accuracy:.2f}")
             
             if best_accuracy < new_accuracy:
                 best_accuracy = new_accuracy
@@ -78,19 +78,30 @@ def get_data_subset(X: np.ndarray, y: np.ndarray, sub_size: float = 0.2) -> Tupl
     return X[indices], y[indices]
 
 def get_neighbor_bag(X, y, bag: Bag) -> Bag:
-    #TODO: check if amout of swap is correct
-        swap_amount = int(len(bag.X) / 1000.0)
+        x_length = len(bag.X)
+        
+        swap_amount = int(x_length * 0.01)
         if swap_amount == 0:
             swap_amount = 1
-        new_bag = Bag(X=bag.X.copy(), y=bag.y.copy(), features=bag.features.copy())
-        
-        for _ in range(swap_amount):
-            swap_index = np.random.randint(0, len(X))
-            tmpX = X[swap_index]
-            tmpy = y[swap_index]
-            new_bag.X[np.random.randint(0, len(new_bag.X))] = tmpX[bag.features]
-            new_bag.y[np.random.randint(0, len(new_bag.y))] = tmpy
             
+        new_bag = Bag(
+            X=np.array(shape=(0, len(bag.features))),
+            y=np.array(shape=(0,)),
+            features=bag.features
+        )
+        for _ in range(swap_amount):
+            is_add = random.choice([True, False])
+            
+            if is_add:
+                index_to_add = np.random.randint(0, len(X))
+                tmpX = X[index_to_add][bag.features].reshape(1, -1)
+                tmpy = y[index_to_add]
+                new_bag.X = np.append(new_bag.X, tmpX, axis=0)
+                new_bag.y = np.append(new_bag.y, tmpy)
+            else:
+                index_to_remove = np.random.randint(0, len(bag.X))
+                new_bag.X = np.delete(new_bag.X, index_to_remove, axis=0)
+                new_bag.y = np.delete(new_bag.y, index_to_remove)
         return new_bag
         
         

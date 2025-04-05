@@ -6,6 +6,7 @@ import random
 from typing import Tuple
 from dataclasses import dataclass
 from typing import List, Dict, Any
+from concurrent.futures import ThreadPoolExecutor
 
 @dataclass
 class BaggingModel:
@@ -24,7 +25,7 @@ def create_bag(X, y, with_replacement: bool) -> Bag:
     if with_replacement:
         indices = np.random.choice(range(len(X)), size=len(X), replace=True)
     else:
-        indices = np.random.choice(range(len(X)), size=len(X/2), replace=False)
+        indices = np.random.choice(range(len(X)), size=int(len(X)/2), replace=False)
     X_sample = X[indices]
     y_sample = y[indices]
     
@@ -43,23 +44,31 @@ def create_bags(X, y, n_bags: int, with_replacement:bool) -> List[Bag]:
     return [create_bag(X, y, with_replacement=with_replacement) for _ in range(n_bags)]
     
     
+def predict_single_model(model, X):
+    """Helper function to predict using a single model."""
+    X_sample = X[model.features]
+    X_sample = X_sample.reshape(1, -1)
+    return model.model.predict(X_sample)
+    
 def predict(X: np.ndarray, models: List[BaggingModel]) -> np.ndarray:
-        """Predict the class of the given data."""
-        
-        if models is None or len(models) == 0:
-            raise ValueError("The model has not been fitted yet.")
-        
-        predictions = []
-        for model in models:
-            X_sample = X[model.features]
-            X_sample = X_sample.reshape(1, -1)
-            prediction = model.model.predict(X_sample)
-            predictions.append(prediction)
-        
-        predictions = np.array(predictions)
-        final_predictions = [np.bincount(pred).argmax() for pred in predictions.T]
-        
-        return final_predictions
+    """Predict the class of the given data using multithreading."""
+    if models is None or len(models) == 0:
+        raise ValueError("The model has not been fitted yet.")
+    
+    # Use ThreadPoolExecutor for multithreading
+    with ThreadPoolExecutor() as executor:
+        predictions = list(executor.map(lambda model: predict_single_model(model, X), models))
+    
+    # Convert predictions to a numpy array
+    predictions = np.array(predictions)
+    final_predictions = [np.bincount(pred).argmax() for pred in predictions.T]
+    
+    return final_predictions
+    
+def get_single_model_accuracy(model: BaggingModel, X: np.ndarray, y: np.ndarray) -> float:
+    """Get the accuracy of a single model."""
+    predictions = predict_single_model(model, X)
+    return accuracy_score(y, predictions)
     
 def get_accuracy(X: np.ndarray, y: np.ndarray, models: List[BaggingModel]) -> float:
         """Get the accuracy of the model."""
