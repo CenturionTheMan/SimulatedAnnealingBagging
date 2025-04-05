@@ -7,6 +7,8 @@ from typing import Tuple
 from dataclasses import dataclass
 from typing import List, Dict, Any
 
+from MeasuresOfDiversity import average_q_statistic
+
 @dataclass
 class BaggingModel:
     model: DecisionTreeClassifier
@@ -24,7 +26,7 @@ def create_bag(X, y, with_replacement: bool) -> Bag:
     if with_replacement:
         indices = np.random.choice(range(len(X)), size=len(X), replace=True)
     else:
-        indices = np.random.choice(range(len(X)), size=len(X/2), replace=False)
+        indices = np.random.choice(range(len(X)), size=int(len(X)/2), replace=False)
     X_sample = X[indices]
     y_sample = y[indices]
     
@@ -41,8 +43,8 @@ def create_bag(X, y, with_replacement: bool) -> Bag:
 
 def create_bags(X, y, n_bags: int, with_replacement:bool) -> List[Bag]:
     return [create_bag(X, y, with_replacement=with_replacement) for _ in range(n_bags)]
-    
-    
+
+        
 def predict(X: np.ndarray, models: List[BaggingModel]) -> np.ndarray:
         """Predict the class of the given data."""
         
@@ -62,9 +64,15 @@ def predict(X: np.ndarray, models: List[BaggingModel]) -> np.ndarray:
         return final_predictions
     
 def get_accuracy(X: np.ndarray, y: np.ndarray, models: List[BaggingModel]) -> float:
-        """Get the accuracy of the model."""
-        predictions = [predict(x, models) for x in X]
-        return accuracy_score(y, predictions)
+    accuracy, _ = get_accuracy_and_predictions(X, y, models)
+    return accuracy
+
+def get_accuracy_and_predictions(X: np.ndarray, y: np.ndarray, models: List[BaggingModel]) -> Tuple[float, np.ndarray]:
+    predictions = [ model.model.predict(X[:,model.features]) for model in models ]
+    predictions = np.array(predictions)
+    final_predictions = [np.bincount(pred).argmax() for pred in predictions.T]
+    accuracy = np.mean([1 if pred == real else 0 for pred, real in zip(final_predictions, y)])
+    return accuracy, predictions    
     
 def create_models(bags: list[Bag], n_trees: int, seed:int = None) -> List[BaggingModel]:
         """Create the model."""
