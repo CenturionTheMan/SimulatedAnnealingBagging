@@ -1,3 +1,4 @@
+from itertools import combinations
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
@@ -17,7 +18,8 @@ class BaggingSA:
     """docstring for BaggingSA."""
     def __init__(self, 
                  X: np.ndarray, y: np.ndarray, bags_with_replacement: bool,
-                 T0: float, alpha:float, max_iterations: int, n_trees: int
+                 T0: float, alpha:float, max_iterations: int, n_trees: int,
+                 fitness_acc: float = 0.5, fitness_div: float = 0.25, fitness_qstat: float = 0.25,
                  ):
         self.bags_with_replacement = bags_with_replacement
         self.T0 = T0
@@ -25,21 +27,45 @@ class BaggingSA:
         self.n_trees = n_trees
         self.X, self.y = X, y
         self.max_iterations = max_iterations
+        self.fitness_acc = fitness_acc
+        self.fitness_div = fitness_div
+        self.fitness_qstat = fitness_qstat
         
         
+    # def calculate_fitness(self, models: List[BaggingModel], X: np.ndarray, y: np.ndarray) -> float:
+    #     """
+    #     Calculate the fitness of the models based on their accuracy.
+    #     """
+    #     accuracy, predictions = get_accuracy_and_predictions(models=models, X=X, y=y)
+        
+    #     q_statistic = average_q_statistic(predictions)
+    #     q_statistic_norm = (q_statistic+1) /2
+    #     return accuracy * (1-q_statistic_norm)       
+    
+    def pairwise_disagreement(self, predictions):
+        """
+        Diversity measure: average disagreement between all pairs of classifiers
+        """
+        disagreement = 0
+        pairs = list(combinations(predictions, 2))
+        for pred1, pred2 in pairs:
+            disagreement += np.mean(pred1 != pred2)
+        return disagreement / len(pairs)
+    
     def calculate_fitness(self, models: List[BaggingModel], X: np.ndarray, y: np.ndarray) -> float:
         """
         Calculate the fitness of the models based on their accuracy.
         """
         accuracy, predictions = get_accuracy_and_predictions(models=models, X=X, y=y)
+        div = self.pairwise_disagreement(predictions)
+        q_statistic = 1 - (average_q_statistic(predictions) + 1) / 2
+        res = self.fitness_acc * accuracy + self.fitness_div * div + self.fitness_qstat * q_statistic
+        return res
         
-        q_statistic = average_q_statistic(predictions)
-        q_statistic_norm = (q_statistic+1) /2        
-        
-        return 2*accuracy + (1 - q_statistic_norm)       
     
     
-    def run_simulated_annealing(self) -> List[DecisionTreeClassifier]:
+    
+    def run_simulated_annealing(self) -> Tuple[List[BaggingModel], List[BaggingModel], float]:
         T = self.T0
         iteration = 0
         
@@ -47,42 +73,43 @@ class BaggingSA:
         
         bags = create_bags(X=X_train, y=y_train, n_bags=self.n_trees, with_replacement=self.bags_with_replacement)
         models = create_models(bags=bags, n_trees=self.n_trees)
+        init_models = models.copy()
         best_models = models.copy()
         
-        accuracy = self.calculate_fitness(X=X_test, y=y_test, models=models)
-        best_accuracy = accuracy
+        fitness = self.calculate_fitness(X=X_test, y=y_test, models=models)
+        best_fitness = fitness
         
-        while T > 0.00001 and iteration < self.max_iterations:
+        while iteration < self.max_iterations:
             bags = [get_neighbor_bag(X_train, y_train, bag) for bag in bags]
             new_models = create_models(bags=bags, n_trees=self.n_trees)
-            new_accuracy = self.calculate_fitness(X=X_test, y=y_test, models=new_models)
+            new_fitness = self.calculate_fitness(X=X_test, y=y_test, models=new_models)
             
-            print(f"Iteration: {iteration}, Temperature: {T:.5f}, Best fitness: {best_accuracy:.3f}, Fitness: {accuracy:.3f}, New fitness: {new_accuracy:.3f}")
+            print(f"Iteration: {iteration}, Temperature: {T:.5f}, Best fitness: {best_fitness:.3f}, Fitness: {fitness:.3f}, New fitness: {new_fitness:.3f}")
             
-            if best_accuracy < new_accuracy:
-                best_accuracy = new_accuracy
+            if best_fitness < new_fitness:
+                best_fitness = new_fitness
                 best_models = new_models.copy()
                 
-            if accuracy < new_accuracy:
+            if fitness < new_fitness:
                 models = new_models.copy()
-                accuracy = new_accuracy
+                fitness = new_fitness
             else:
                 threshold = random.uniform(0, 1)
-                prob = np.exp((new_accuracy - accuracy) / T)
+                prob = np.exp((new_fitness - fitness) / T)
                 
                 if prob > threshold:
                     models = new_models.copy()
-                    accuracy = new_accuracy
+                    fitness = new_fitness
 
             T *= self.alpha
             iteration += 1
         
-        return best_models
+        return best_models, init_models, best_fitness
         
             
 def get_neighbor_bag(X, y, bag: Bag) -> Bag:
         x_length = len(bag.X)
-        swap_amount = int(x_length * 0.01)
+        swap_amount = int(x_length * 0.001)
         if swap_amount == 0:
             swap_amount = 1
             

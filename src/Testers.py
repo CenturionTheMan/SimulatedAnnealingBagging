@@ -49,7 +49,6 @@ class Tester:
 
     def test_bagging(self, reps: int | None = None, save_path: str | None = None) -> pd.DataFrame:
         reps = reps if reps is not None else self.reps
-        
         def method_to_run():
             bags = create_bags(self.X_train, self.y_train, n_bags=self.trees_n, with_replacement=False)
             models = create_models(bags=bags, n_trees=self.trees_n)
@@ -62,9 +61,9 @@ class Tester:
         def method_to_run():
             bagging_sa = BaggingSA(X=self.X_train, y=self.y_train, bags_with_replacement=False,
                                 T0=self.T0, alpha=self.alpha, max_iterations=self.max_iterations, n_trees=self.trees_n)
-            models = bagging_sa.run_simulated_annealing()
-            return get_accuracy(models=models, X=self.X_test, y=self.y_test)
-        return test_method(method_to_run, args=None, reps=reps, save_path=save_path)        
+            best_models, _, _ = bagging_sa.run_simulated_annealing()
+            return get_accuracy(models=best_models, X=self.X_test, y=self.y_test)
+        return test_method(method_to_run, args=None, reps=reps, save_path=save_path)     
         
         
 
