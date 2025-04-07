@@ -82,7 +82,6 @@ class BaggingGEN:
     
     def evaluate_fitness(self, population: List[Bag], X_test: np.ndarray, y_test: np.ndarray) -> Tuple[List[float], List[BaggingModel]]:
         models = create_models(bags=population, n_trees=self.population_size)
-        
         predictions_per_model = [model.model.predict(X_test[:,model.features]) for model in models]
         accuracy_per_model = [accuracy_score(y_test, pred) for pred in predictions_per_model]
         return accuracy_per_model, models        
@@ -99,11 +98,11 @@ class BaggingGEN:
         return selected  
     
     def run_genetic_algorithm(self) -> Tuple[List[BaggingModel], List[BaggingModel], float]:
-        if self.X_test is not None and self.y_test is not None:
-            X_test, y_test = self.X_test, self.y_test
-            X_train, y_train = self.X, self.y
-        else:
-            X_train, X_test, y_train, y_test = train_test_split(self.X, self.y, test_size=0.1, shuffle=True)
+        # if self.X_test is not None and self.y_test is not None:
+        #     X_test, y_test = self.X_test, self.y_test
+        #     X_train, y_train = self.X, self.y
+        # else:
+        X_train, X_test, y_train, y_test = train_test_split(self.X, self.y, test_size=0.1, shuffle=True)
         population = create_bags(X=X_train, y=y_train, n_bags=self.population_size, with_replacement=False)
         
         initial_population = None
@@ -113,9 +112,11 @@ class BaggingGEN:
         iteration = 0
         
         while iteration < self.max_iterations:
-            _, X_test_sub, _, y_test_sub = train_test_split(X_test, y_test, test_size=0.5, shuffle=True)
-            fitness_per_model, models = self.evaluate_fitness(population, X_test_sub, y_test_sub)
+            # _, X_test_sub, _, y_test_sub = train_test_split(X_test, y_test, test_size=0.5, shuffle=True)
+            fitness_per_model, models = self.evaluate_fitness(population, X_test=X_test, y_test=y_test)
             models_subset, subset_fitness = self.get_n_best_models(models, fitness_per_model)
+
+            accuracy = get_accuracy(X=self.X_test, y=self.y_test, models=models_subset)
 
             if initial_population is None:
                 initial_population = models_subset.copy()
@@ -124,7 +125,7 @@ class BaggingGEN:
                 best_fitness = subset_fitness
                 best_models = models_subset.copy()
             
-            print(f"Iteration: {iteration}, Best fitness: {best_fitness:.3f}, Current fitness: {subset_fitness:.3f}")
+            print(f"Iteration: {iteration}, Best fitness: {best_fitness:.3f}, Current fitness: {subset_fitness:.3f}, Accuracy: {accuracy:.3f}")
             
             selected_population = self.selection(population, fitness_per_model)
             self.mutate(selected_population, self.mutation_rate, X_train, y_train)
@@ -138,5 +139,4 @@ class BaggingGEN:
     def get_n_best_models(self, models: List[BaggingModel], fitness_per_model: List[float]) -> List[BaggingModel]:
         sorted_models = sorted(zip(models, fitness_per_model), key=lambda x: x[1], reverse=True)
         best = sorted_models[:self.n_trees]
-        
         return [model for model, _ in best], np.mean([fitness for _, fitness in best])
