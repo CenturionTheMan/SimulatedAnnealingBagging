@@ -1,0 +1,97 @@
+from typing import List
+from Bagging import Bag, BaggingModel, create_models, create_bags, evaluate
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+from sklearn import datasets
+from sklearn.tree import DecisionTreeClassifier
+import numpy as np
+import pandas as pd
+import random
+
+
+class BaggingGA:
+    def __init__(self,
+                 X: np.ndarray, y: np.ndarray,
+                 n_trees: int,
+                 max_iterations: int, mutation_rate: float, crossover_rate: float, population_size: int|None = None):
+        self.X = X
+        self.y = y
+        self.n_trees = n_trees
+        self.max_iterations = max_iterations
+        self.mutation_rate = mutation_rate
+        self.crossover_rate = crossover_rate
+        self.population_size = population_size if population_size else n_trees
+
+
+    def calculate_fitness(self, models: List[BaggingModel], X_test: np.ndarray, y_test: np.ndarray) -> List[float]:
+        predictions_per_model = [model.model.predict(X_test[:,model.bag.features]) for model in models]
+        accuracy_per_model = [accuracy_score(y_test, pred) for pred in predictions_per_model]
+        return accuracy_per_model
+    
+    def selection(self, population: List[Bag], fitness: List[float], X_train: np.ndarray) -> List[Bag]:
+        remain_amount = int(len(population) * 0.5)
+
+        cumulative_fitness = np.cumsum(fitness)
+        cumulative_fitness = cumulative_fitness / cumulative_fitness[-1]
+        selected = random.choices(population=population, cum_weights=cumulative_fitness, k=remain_amount)
+        new_bags = create_bags(X_train, self.population_size - remain_amount)
+        res = selected + new_bags
+        return res
+    
+    def mutate(self, population: List[Bag]) -> List[BaggingModel]:
+        for single in population:
+            if random.random() >= self.mutation_rate:
+                continue
+            selected = np.random.choice(range(len(single.X_bin)), size=int(len(single.X_bin) * 0.01), replace=False)
+            single.X_bin[selected] = np.random.randint(0, 2, size=len(selected))
+        return population
+    
+    def crossover(self, population: List[Bag]) -> List[Bag]:
+        for i in range(0, len(population), 2):
+            if random.random() >= self.crossover_rate:
+                continue
+            crossover_point = random.randint(0, len(population[0].X_bin) - 1)
+            tmp = population[i].X_bin[:crossover_point].copy()
+            population[i].X_bin[:crossover_point] = population[i + 1].X_bin[:crossover_point]
+            population[i + 1].X_bin[:crossover_point] = tmp
+        return population
+        
+    def run(self, X_for_test, y_for_test) -> List[BaggingModel]:
+        X_train, X_test, y_train, y_test = train_test_split(self.X, self.y, test_size=0.2, shuffle=True)
+        
+        population = create_bags(X_train, self.population_size)
+        
+        best_models = None
+        best_fitness = None
+        iteration = 0
+
+        while iteration < self.max_iterations:
+            models = create_models(X_train, y_train, population)
+            fitness = self.calculate_fitness(models, X_test, y_test)
+            fitness_pointer = np.median(fitness)
+
+            if(X_for_test is not None and y_for_test is not None):
+                n_models = self.get_n_models(models, fitness)
+                accuracy = evaluate(X=X_for_test, y=y_for_test, models=n_models)
+            else:
+                accuracy = None
+
+            if best_fitness is None or fitness_pointer > best_fitness:
+                best_fitness = fitness_pointer
+                best_models = models
+                
+            print(f"Iteration {iteration}, Best fitness: {best_fitness:.3f}, Fitness: {fitness_pointer:.3f}, Accuracy: {accuracy:.3f}")
+            
+            population = self.selection(population, fitness, X_train)
+            #population = self.crossover(population)
+            #population = self.mutate(population)
+
+            iteration += 1
+
+        n_best_models = self.get_n_models(best_models, fitness)
+        return n_best_models
+    
+    def get_n_models(self, models: List[BaggingModel], fitness_per_model: List[float]) -> List[BaggingModel]:
+        sorted_models = sorted(zip(models, fitness_per_model), key=lambda x: x[1], reverse=True)
+        best = sorted_models[:self.n_trees]
+        return [model for model, _ in best]

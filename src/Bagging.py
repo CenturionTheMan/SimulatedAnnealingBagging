@@ -7,84 +7,66 @@ from typing import Tuple
 from dataclasses import dataclass
 from typing import List, Dict, Any
 
-from MeasuresOfDiversity import average_q_statistic
+    
+@dataclass
+class Bag:
+    X_bin: np.ndarray[np.bool]
+    y_bin: np.ndarray[np.bool]
+    features: List[int]
+    
+    def get_mapped_data(self, X, y) -> Tuple[np.ndarray, np.ndarray]:
+        X_mapped = X[self.X_bin][:, self.features]
+        y_mapped = y[self.X_bin]
+        return X_mapped, y_mapped
 
 @dataclass
 class BaggingModel:
     model: DecisionTreeClassifier
-    features: List[int]
-    
-@dataclass
-class Bag:
-    X: np.ndarray
-    y: np.ndarray
-    features: List[int]
+    bag: Bag
 
 
-def create_bag(X, y, with_replacement: bool) -> Bag:
-    """Create a bootstrap sample."""
-    if with_replacement:
-        indices = np.random.choice(range(len(X)), size=len(X), replace=True)
-    else:
-        indices = np.random.choice(range(len(X)), size=int(len(X)/2), replace=False)
-    X_sample = X[indices]
-    y_sample = y[indices]
+def create_bag(X) -> Bag:
+    indices = np.random.choice(range(len(X)), size=int(len(X)/2), replace=False)
+
+    X_bin = np.zeros(len(X), dtype=bool)
+    X_bin[indices] = True
+    y_bin = np.zeros(len(X), dtype=bool)
+    y_bin[indices] = True
     
     data_features_amount = X.shape[1]
-    random_features = np.random.choice(
+    features = np.random.choice(
             range(data_features_amount),
             size=int(np.sqrt(data_features_amount)), 
             replace=False
         )
+    bag = Bag(X_bin, y_bin, features)
+    return bag
 
-    X_sample = X_sample[:, random_features]
-    return Bag(X_sample, y_sample, random_features)
+def create_bags(X, bags_amount: int) -> List[Bag]:
+    bags = [create_bag(X) for _ in range(bags_amount)]
+    return bags
 
+def create_model(X, y, bag: Bag) -> BaggingModel:
+    X_mapped, y_mapped = bag.get_mapped_data(X, y)
+    model = DecisionTreeClassifier()
+    model.fit(X_mapped, y_mapped)
+    return BaggingModel(model, bag)
 
-def create_bags(X, y, n_bags: int, with_replacement:bool) -> List[Bag]:
-    return [create_bag(X, y, with_replacement=with_replacement) for _ in range(n_bags)]
+def create_models(X, y, bags: List[Bag]) -> List[BaggingModel]:
+    models = [create_model(X, y, bag) for bag in bags]
+    return models
 
-        
-def predict(X: np.ndarray, models: List[BaggingModel]) -> np.ndarray:
-        """Predict the class of the given data."""
-        
-        if models is None or len(models) == 0:
-            raise ValueError("The model has not been fitted yet.")
-        
-        predictions = []
-        for model in models:
-            X_sample = X[model.features]
-            X_sample = X_sample.reshape(1, -1)
-            prediction = model.model.predict(X_sample)
-            predictions.append(prediction)
-        
-        predictions = np.array(predictions)
-        final_predictions = [np.bincount(pred).argmax() for pred in predictions.T]
-        
-        return final_predictions
-    
-def get_accuracy(X: np.ndarray, y: np.ndarray, models: List[BaggingModel]) -> float:
-    accuracy, _ = get_accuracy_and_predictions(X, y, models)
-    return accuracy
-
-def get_accuracy_and_predictions(X: np.ndarray, y: np.ndarray, models: List[BaggingModel]) -> Tuple[float, np.ndarray]:
-    predictions = [ model.model.predict(X[:,model.features]) for model in models ]
+def predict(X, models: List[BaggingModel]) -> np.ndarray:
+    predictions = [ model.model.predict(X[:,model.bag.features]) for model in models ]
     predictions = np.array(predictions)
     final_predictions = [np.bincount(pred).argmax() for pred in predictions.T]
-    accuracy = np.mean([1 if pred == real else 0 for pred, real in zip(final_predictions, y)])
-    return accuracy, predictions    
-    
-def create_models(bags: list[Bag], n_trees: int, seed:int = None) -> List[BaggingModel]:
-        """Create the model."""
-        models = []
-        
-        if len(bags) != n_trees:
-            raise ValueError("The number of bags must be equal to the number of estimators.")
-        
-        for i in range(n_trees):
-            X_sample, y_sample, random_features = bags[i].X, bags[i].y, bags[i].features
-            model = DecisionTreeClassifier(random_state=seed) if seed is not None else DecisionTreeClassifier()
-            model.fit(X_sample, y_sample)
-            models.append(BaggingModel(model, random_features))
-            
-        return models
+    return np.array(final_predictions)
+
+def evaluate(X, y, models: List[BaggingModel]) -> float:
+    predictions = predict(X, models)
+    accuracy = accuracy_score(y, predictions)
+    return accuracy
+
+def evaluate_predictions(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    accuracy = accuracy_score(y_true, y_pred)
+    return accuracy
