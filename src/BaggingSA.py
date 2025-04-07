@@ -56,6 +56,9 @@ class BaggingSA:
             else:
                 accuracy = None
             
+            if fitness == new_fitness:
+                print("Fitness is the same, skipping iteration")
+            
             print(f"Iteration: {iteration}, Temperature: {T:.4f}, Best: {best_fitness:.4f}, Fitness: {fitness:.4f}, New Fitness: {new_fitness:.4f}, Accuracy: {accuracy:.4f}")
             
             if new_fitness > best_fitness:
