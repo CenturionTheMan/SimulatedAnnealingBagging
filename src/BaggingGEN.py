@@ -22,6 +22,8 @@ class BaggingGEN:
         self.n_trees = n_trees
         self.mutation_rate = mutation_rate
         self.crossover_rate = crossover_rate
+        self.X_test = None
+        self.y_test = None
         
 
     def mutate(self, population: List[Bag], mutate_rate:float, X: np.ndarray, y: np.ndarray) -> None:
@@ -76,27 +78,14 @@ class BaggingGEN:
                 new_population.append(parent2)
                 
         return new_population
-    
-    
-    
-    def pairwise_disagreement(self, predictions):
-        """
-        Diversity measure: average disagreement between all pairs of classifiers
-        """
-        disagreement = 0
-        pairs = list(combinations(predictions, 2))
-        for pred1, pred2 in pairs:
-            disagreement += np.mean(pred1 != pred2)
-        return disagreement / len(pairs)
+
     
     def evaluate_fitness(self, population: List[Bag], X_test: np.ndarray, y_test: np.ndarray) -> Tuple[List[float], List[BaggingModel]]:
         models = create_models(bags=population, n_trees=self.population_size)
         
         predictions_per_model = [model.model.predict(X_test[:,model.features]) for model in models]
-        #accuracy_per_model = [accuracy_score(y_test, pred) for pred in predictions_per_model]
-        div = [self.pairwise_disagreement(predictions) for predictions in predictions_per_model]
-        return div, models
-        # return accuracy_per_model, models        
+        accuracy_per_model = [accuracy_score(y_test, pred) for pred in predictions_per_model]
+        return accuracy_per_model, models        
     
     
     def selection(self, population: List[Bag], fitness: List[float]) -> List[Bag]:
@@ -110,12 +99,15 @@ class BaggingGEN:
         return selected  
     
     def run_genetic_algorithm(self) -> Tuple[List[BaggingModel], List[BaggingModel], float]:
-        X_train, X_test, y_train, y_test = train_test_split(self.X, self.y, test_size=0.1, shuffle=True)
+        if self.X_test is not None and self.y_test is not None:
+            X_test, y_test = self.X_test, self.y_test
+            X_train, y_train = self.X, self.y
+        else:
+            X_train, X_test, y_train, y_test = train_test_split(self.X, self.y, test_size=0.1, shuffle=True)
         population = create_bags(X=X_train, y=y_train, n_bags=self.population_size, with_replacement=False)
-        initial_population = population.copy()
         
+        initial_population = None
         best_models = None
-        best_models_fitness = None
         best_fitness = 0.0
         
         iteration = 0
@@ -123,27 +115,28 @@ class BaggingGEN:
         while iteration < self.max_iterations:
             _, X_test_sub, _, y_test_sub = train_test_split(X_test, y_test, test_size=0.5, shuffle=True)
             fitness_per_model, models = self.evaluate_fitness(population, X_test_sub, y_test_sub)
-            fitness_mean = np.mean(fitness_per_model)
+            models_subset, subset_fitness = self.get_n_best_models(models, fitness_per_model)
 
-            if best_fitness < fitness_mean:
-                best_fitness = fitness_mean
-                best_models_fitness = fitness_per_model.copy()
-                best_models = models.copy()
+            if initial_population is None:
+                initial_population = models_subset.copy()
             
-            print(f"Iteration: {iteration}, Best fitness: {best_fitness:.3f}, Current fitness: {fitness_mean:.3f}")
+            if best_fitness < subset_fitness:
+                best_fitness = subset_fitness
+                best_models = models_subset.copy()
+            
+            print(f"Iteration: {iteration}, Best fitness: {best_fitness:.3f}, Current fitness: {subset_fitness:.3f}")
             
             selected_population = self.selection(population, fitness_per_model)
             self.mutate(selected_population, self.mutation_rate, X_train, y_train)
             population = self.crossover(selected_population, self.crossover_rate)
             
             iteration += 1
-            
         
-        fitness_per_model, initial_models = self.evaluate_fitness(initial_population, X_test, y_test)
-        
-        return self.get_n_best_models(best_models, best_models_fitness, self.n_trees), self.get_n_best_models(initial_models, fitness_per_model, self.n_trees), best_fitness
+        return best_models, initial_population, best_fitness        
     
     
-    def get_n_best_models(self, models: List[BaggingModel], fitness_per_model: List[float], n: int) -> List[BaggingModel]:
+    def get_n_best_models(self, models: List[BaggingModel], fitness_per_model: List[float]) -> List[BaggingModel]:
         sorted_models = sorted(zip(models, fitness_per_model), key=lambda x: x[1], reverse=True)
-        return [model for model, _ in sorted_models[:n]]
+        best = sorted_models[:self.n_trees]
+        
+        return [model for model, _ in best], np.mean([fitness for _, fitness in best])
