@@ -9,18 +9,24 @@ from typing import List, Dict, Any
 
 from MeasuresOfDiversity import average_q_statistic
 
-@dataclass
-class BaggingModel:
-    model: DecisionTreeClassifier
-    features: List[int]
+
     
 @dataclass
 class Bag:
     X: np.ndarray
     y: np.ndarray
     features: List[int]
+    
+    def count(self) -> int:
+        """Count the number of samples."""
+        return len(self.X)
 
-
+@dataclass
+class BaggingModel:
+    model: DecisionTreeClassifier
+    features: List[int]
+    
+    
 def create_bag(X, y, with_replacement: bool) -> Bag:
     """Create a bootstrap sample."""
     if with_replacement:
@@ -44,24 +50,12 @@ def create_bag(X, y, with_replacement: bool) -> Bag:
 def create_bags(X, y, n_bags: int, with_replacement:bool) -> List[Bag]:
     return [create_bag(X, y, with_replacement=with_replacement) for _ in range(n_bags)]
 
-        
 def predict(X: np.ndarray, models: List[BaggingModel]) -> np.ndarray:
-        """Predict the class of the given data."""
-        
-        if models is None or len(models) == 0:
-            raise ValueError("The model has not been fitted yet.")
-        
-        predictions = []
-        for model in models:
-            X_sample = X[model.features]
-            X_sample = X_sample.reshape(1, -1)
-            prediction = model.model.predict(X_sample)
-            predictions.append(prediction)
-        
-        predictions = np.array(predictions)
-        final_predictions = [np.bincount(pred).argmax() for pred in predictions.T]
-        
-        return final_predictions
+    """Predict the class of the given data."""
+    predictions = [ model.model.predict(X[:,model.features]) for model in models ]
+    predictions = np.array(predictions)
+    final_predictions = [np.bincount(pred).argmax() for pred in predictions.T]
+    return final_predictions
     
 def get_accuracy(X: np.ndarray, y: np.ndarray, models: List[BaggingModel]) -> float:
     accuracy, _ = get_accuracy_and_predictions(X, y, models)

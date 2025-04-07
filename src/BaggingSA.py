@@ -89,7 +89,7 @@ class BaggingSA:
             if best_fitness < new_fitness:
                 best_fitness = new_fitness
                 best_models = new_models.copy()
-                
+            
             if fitness < new_fitness:
                 models = new_models.copy()
                 fitness = new_fitness
@@ -134,7 +134,8 @@ def get_neighbor_bag(X, y, bag: Bag) -> Bag:
                 new_bag.y = np.delete(new_bag.y, index_to_remove)
                 
         return new_bag 
-        
+    
+    
         
 
         
