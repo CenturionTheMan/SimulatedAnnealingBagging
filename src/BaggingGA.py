@@ -37,7 +37,7 @@ class BaggingGA:
         accuracy_per_model = [accuracy_score(y_test, pred) for pred in predictions_per_model]
         disagreement_per_model = self.disagreement_measure(models, X_test)
 
-        alpha = 1
+        alpha = 0.9
         
         fitness_per_model = [ 
             accuracy * alpha + disagreement * (1 - alpha)
@@ -46,11 +46,12 @@ class BaggingGA:
         return fitness_per_model
     
     def selection(self, population: List[Bag], fitness: List[float], X_train: np.ndarray) -> List[Bag]:
-        cumulative_fitness = np.cumsum(fitness)
-        cumulative_fitness = cumulative_fitness / cumulative_fitness[-1]
-        selected = random.choices(population=population, cum_weights=cumulative_fitness, k=len(population))
-        return selected
-    
+        sum_fitness = sum(fitness)
+        selection_probs = [f / sum_fitness for f in fitness]
+        selected_indices = np.random.choice(range(len(population)), size=self.population_size, p=selection_probs, replace=True)
+        pop = np.array(population)[selected_indices]
+        return pop.tolist()        
+
     def mutate(self, population: List[Bag]) -> List[BaggingModel]:
         for single in population:
             if random.random() >= self.mutation_rate:
