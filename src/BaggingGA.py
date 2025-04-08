@@ -37,7 +37,7 @@ class BaggingGA:
         accuracy_per_model = [accuracy_score(y_test, pred) for pred in predictions_per_model]
         disagreement_per_model = self.disagreement_measure(models, X_test)
 
-        alpha = 0.6
+        alpha = 1
         
         fitness_per_model = [ 
             accuracy * alpha + disagreement * (1 - alpha)
