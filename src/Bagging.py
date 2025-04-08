@@ -1,3 +1,4 @@
+from copy import deepcopy
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
@@ -24,6 +25,13 @@ class Bag:
     
     def size_ratio(self) -> float:
         return self.count_samples() / len(self.X_bin)
+    
+    def copy(self) -> "Bag":
+        return Bag(
+            X_bin=deepcopy(self.X_bin),
+            y_bin=deepcopy(self.y_bin),
+            features=deepcopy(self.features)
+        )
 
 @dataclass
 class BaggingModel:
