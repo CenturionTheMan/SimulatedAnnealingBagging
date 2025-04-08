@@ -37,7 +37,7 @@ class BaggingGA:
         accuracy_per_model = [accuracy_score(y_test, pred) for pred in predictions_per_model]
         disagreement_per_model = self.disagreement_measure(models, X_test)
 
-        alpha = 1
+        alpha = 0.8
         
         fitness_per_model = [ 
             accuracy * alpha + disagreement * (1 - alpha)
@@ -55,8 +55,11 @@ class BaggingGA:
         for single in population:
             if random.random() >= self.mutation_rate:
                 continue
-            selected = np.random.choice(range(len(single.X_bin)), size=int(len(single.X_bin) * 0.01), replace=False)
-            single.X_bin[selected] = np.random.randint(0, 2, size=len(selected))
+            
+            random_index = random.randint(0, len(single.X_bin) - 1)
+            # selected = np.random.choice(range(len(single.X_bin)), size=int(len(single.X_bin) * 0.01), replace=False)
+            # single.X_bin[selected] = np.random.randint(0, 2, size=len(selected))
+            single.X_bin[random_index] = not single.X_bin[random_index]
         return population
     
     def crossover(self, population: List[Bag]) -> List[Bag]:
@@ -101,8 +104,8 @@ class BaggingGA:
             print(f"Iteration {iteration}, Best fitness: {best_fitness:.3f}, Fitness: {fitness_pointer:.3f}, Accuracy: {accuracy:.3f}")
             
             population = self.selection(population, fitness, X_train)
-            #population = self.crossover(population)
-            #population = self.mutate(population)
+            population = self.crossover(population)
+            population = self.mutate(population)
 
             iteration += 1
 
