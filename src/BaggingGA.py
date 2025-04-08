@@ -1,5 +1,5 @@
 from typing import List
-from Bagging import Bag, BaggingModel, create_models, create_bags, evaluate
+from Bagging import Bag, BaggingModel, create_models, create_bags, evaluate, predict
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 from sklearn import datasets
@@ -22,21 +22,34 @@ class BaggingGA:
         self.crossover_rate = crossover_rate
         self.population_size = population_size if population_size else n_trees
 
+    def disagreement_measure(self, models: List[BaggingModel], X_test: np.ndarray) -> List[float]:
+        res = []
+        pop_predictions = predict(X_test, models)
+        
+        for model in models:
+            model_predictions = model.model.predict(X_test[:,model.bag.features])
+            disagreement = np.sum(pop_predictions != model_predictions) / len(model_predictions)
+            res.append(disagreement)
+        return res
 
     def calculate_fitness(self, models: List[BaggingModel], X_test: np.ndarray, y_test: np.ndarray) -> List[float]:
         predictions_per_model = [model.model.predict(X_test[:,model.bag.features]) for model in models]
         accuracy_per_model = [accuracy_score(y_test, pred) for pred in predictions_per_model]
-        return accuracy_per_model
+        disagreement_per_model = self.disagreement_measure(models, X_test)
+
+        alpha = 0.6
+        
+        fitness_per_model = [ 
+            accuracy * alpha + disagreement * (1 - alpha)
+            for accuracy, disagreement in zip(accuracy_per_model, disagreement_per_model)
+        ]
+        return fitness_per_model
     
     def selection(self, population: List[Bag], fitness: List[float], X_train: np.ndarray) -> List[Bag]:
-        remain_amount = int(len(population) * 0.5)
-
         cumulative_fitness = np.cumsum(fitness)
         cumulative_fitness = cumulative_fitness / cumulative_fitness[-1]
-        selected = random.choices(population=population, cum_weights=cumulative_fitness, k=remain_amount)
-        new_bags = create_bags(X_train, self.population_size - remain_amount)
-        res = selected + new_bags
-        return res
+        selected = random.choices(population=population, cum_weights=cumulative_fitness, k=len(population))
+        return selected
     
     def mutate(self, population: List[Bag]) -> List[BaggingModel]:
         for single in population:
@@ -55,6 +68,11 @@ class BaggingGA:
             population[i].X_bin[:crossover_point] = population[i + 1].X_bin[:crossover_point]
             population[i + 1].X_bin[:crossover_point] = tmp
         return population
+    
+    def get_n_models(self, models: List[BaggingModel], fitness_per_model: List[float]) -> List[BaggingModel]:
+        sorted_models = sorted(zip(models, fitness_per_model), key=lambda x: x[1], reverse=True)
+        best = sorted_models[:self.n_trees]
+        return [model for model, _ in best]
         
     def run(self, X_for_test, y_for_test) -> List[BaggingModel]:
         X_train, X_test, y_train, y_test = train_test_split(self.X, self.y, test_size=0.2, shuffle=True)
@@ -91,7 +109,3 @@ class BaggingGA:
         n_best_models = self.get_n_models(best_models, fitness)
         return n_best_models
     
-    def get_n_models(self, models: List[BaggingModel], fitness_per_model: List[float]) -> List[BaggingModel]:
-        sorted_models = sorted(zip(models, fitness_per_model), key=lambda x: x[1], reverse=True)
-        best = sorted_models[:self.n_trees]
-        return [model for model, _ in best]
