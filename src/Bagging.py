@@ -18,6 +18,12 @@ class Bag:
         X_mapped = X[self.X_bin][:, self.features]
         y_mapped = y[self.X_bin]
         return X_mapped, y_mapped
+    
+    def count_samples(self) -> int:
+        return np.sum(self.X_bin)   
+    
+    def size_ratio(self) -> float:
+        return self.count_samples() / len(self.X_bin)
 
 @dataclass
 class BaggingModel:
