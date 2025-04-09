@@ -13,13 +13,12 @@ class BaggingGA:
     def __init__(self,
                  X: np.ndarray, y: np.ndarray,
                  n_trees: int,
-                 max_iterations: int, mutation_rate: float, crossover_rate: float, generation_gap: float, population_size: int|None = None):
+                 max_iterations: int, mutation_rate: float, generation_gap: float, population_size: int|None = None):
         self.X = X
         self.y = y
         self.n_trees = n_trees
         self.max_iterations = max_iterations
         self.mutation_rate = mutation_rate
-        self.crossover_rate = crossover_rate
         self.population_size = population_size if population_size else n_trees
         self.population_gap = generation_gap
         self.features = X.shape[1]
@@ -52,37 +51,19 @@ class BaggingGA:
         sum_fitness = sum(fitness)
         selection_probs = [f / sum_fitness for f in fitness]
         selected_indices = np.random.choice(range(len(population)), size=int(self.population_size * (1-self.population_gap)), 
-                                            p=selection_probs, replace=True)
+                                            p=selection_probs, replace=False)
         pop = np.array(population)[selected_indices]
         return pop.tolist()        
 
     def mutate(self, population: List[Bag]) -> List[BaggingModel]:
-        for single in population:
+        for i, single in enumerate(population):
             if random.random() >= self.mutation_rate:
                 continue
-            is_feature_mutation = random.random() < 0.1
-            if is_feature_mutation:
-                mutation_point = random.randint(0, len(single.features) - 1)
-                new_feature = None
-                while new_feature is None or new_feature in single.features:
-                    new_feature = random.randint(0, self.features - 1)
-                single.features[mutation_point] = new_feature
-            else:            
-                mutation_point = random.randint(0, len(single.X_bin) - 1)
-                single.X_bin[mutation_point] = not single.X_bin[mutation_point]
-        return population
-    
-    def crossover(self, org_population: List[Bag]) -> List[Bag]:
-        population = np.random.permutation(org_population)
-        for i in range(0, len(population), 2):
-            if i + 1 >= len(population):
-                break
-            if random.random() >= self.crossover_rate:
-                continue
-            crossover_point = random.randint(0, len(population[0].X_bin) - 1)
-            tmp = population[i].X_bin[:crossover_point].copy()
-            population[i].X_bin[:crossover_point] = population[i + 1].X_bin[:crossover_point]
-            population[i + 1].X_bin[:crossover_point] = tmp
+            mutation_point = random.randint(0, len(single.features) - 1)
+            new_feature = None
+            while new_feature is None or new_feature in single.features:
+                new_feature = random.randint(0, self.features - 1)
+            single.features[mutation_point] = new_feature
         return population
     
     def get_n_models(self, models: List[BaggingModel], fitness_per_model: List[float]) -> List[BaggingModel]:
@@ -120,7 +101,6 @@ class BaggingGA:
                 fun_monitor(iteration, best_fitness_mean, fitness_pointer, accuracy)
             
             population = self.selection(population, fitness)
-            population = self.crossover(population)
             population = self.mutate(population)
 
             if self.population_gap > 0:

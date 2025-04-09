@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Tuple
 from Bagging import Bag, BaggingModel, create_models, create_bags, evaluate
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
@@ -9,37 +9,85 @@ import pandas as pd
 import random
 
 
-
 class BaggingSA:
     def __init__(self, 
                  X: np.ndarray, y: np.ndarray,
                  T0: float, alpha:float, max_iterations: int, n_trees: int,
+                 feature_mutation_chance: float = 0.1, test_split_amount: int = 10,
                  ):
         self.T0 = T0
         self.alpha = alpha
         self.n_trees = n_trees
-        self.X, self.y = X, y
         self.max_iterations = max_iterations
-    
-    
-    def calculate_fitness(self, models: List[BaggingModel], X: np.ndarray, y: np.ndarray) -> float:
-        accuracy = evaluate(X=X, y=y, models=models)
+        self.feature_mutation_chance = feature_mutation_chance
+        self.test_split_amount = test_split_amount
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=True)
+        self.X_train = X_train
+        self.y_train = y_train
+        self.sub_groups_X_test = np.array_split(X_test, self.test_split_amount)
+        self.sub_groups_y_test = np.array_split(y_test, self.test_split_amount)
+        self.features = X.shape[1]
+        
+    def calculate_fitness(self, models: List[BaggingModel]) -> float:
+        acc_sum = 0
+        for i in range(self.test_split_amount):
+            sub_X = self.sub_groups_X_test[i]
+            sub_y = self.sub_groups_y_test[i]
+            
+            accuracy = evaluate(X=sub_X, y=sub_y, models=models)
+            acc_sum += accuracy
+        accuracy = acc_sum / self.test_split_amount
         return accuracy
     
-    def mutate(self, population: List[Bag]) -> List[BaggingModel]:
-        for single in population:
-            selected = np.random.choice(range(len(single.X_bin)), size=int(len(single.X_bin) * 0.01), replace=False)
-            single.X_bin[selected] = np.random.randint(0, 2, size=len(selected))
-        return population
+    def get_neighbors(self, population: List[Bag]) -> List[BaggingModel]:
+        bags = [single.copy() for single in population]
+        for single in bags:
+            is_feature_mutation = random.random() < self.feature_mutation_chance
+            
+            if is_feature_mutation:
+                mutation_point = random.randint(0, len(single.features) - 1)
+                new_feature = None
+                while new_feature is None or new_feature in single.features:
+                    new_feature = random.randint(0, self.features - 1)
+                single.features[mutation_point] = new_feature
+            else:            
+                mutation_point = random.randint(0, len(single.X_bin) - 1)
+                single.X_bin[mutation_point] = not single.X_bin[mutation_point]
+        return bags
     
-    def run(self, X_for_test = None, y_for_test = None) -> List[BaggingModel]:
+    def get_initial_population(self) -> Tuple[List[Bag], List[BaggingModel], float]:
+        amount = self.n_trees * 10
+        bags = create_bags(self.X_train, amount)
+        models = create_models(self.X_train, self.y_train, bags)
+        
+        mean_accuracy = []
+        for X_test, y_test in zip(self.sub_groups_X_test, self.sub_groups_y_test):
+            predictions_per_model = [model.model.predict(X_test[:,model.bag.features]) for model in models]
+            accuracy_per_model = [accuracy_score(y_test, pred) for pred in predictions_per_model]
+            mean_accuracy.append(accuracy_per_model)
+        
+        accuracy_per_model = np.mean(mean_accuracy, axis=0)
+        sorted_res = sorted(zip(bags, models, accuracy_per_model), key=lambda x: x[2], reverse=True)
+        best = sorted_res[:self.n_trees]
+        best_bags, best_models, best_accuracy = zip(*best)
+        fitness = self.calculate_fitness(best_models)
+        
+        return list(best_bags), list(best_models), fitness
+
+        
+    
+    def calculate_probability(self, newFitness: float, oldFitness: float, temperature: float) -> float:
+        diff = newFitness - oldFitness
+        if diff / temperature > 709:
+            prob = 1.0 
+        else:
+            prob = np.exp(diff / temperature)
+        return prob
+    
+    def run(self, X_for_test = None, y_for_test = None, monitor_fun = None) -> List[BaggingModel]:
         T = self.T0
         
-        X_train, X_test, y_train, y_test = train_test_split(self.X, self.y, test_size=0.2, shuffle=True)
-        
-        bags = create_bags(X_train, self.n_trees)
-        models = create_models(X_train, y_train, bags)
-        fitness = self.calculate_fitness(models, X_test, y_test)
+        bags, models, fitness = self.get_initial_population()
         
         best_models = models.copy()
         best_fitness = fitness
@@ -47,35 +95,33 @@ class BaggingSA:
         iteration = 0
         
         while T > 1e-10 and iteration < self.max_iterations:
-            new_bags = self.mutate(bags)
-            new_models = create_models(X_train, y_train, new_bags)
-            new_fitness = self.calculate_fitness(models, X_test, y_test)
+            new_bags = self.get_neighbors(bags)
+            models = create_models(self.X_train, self.y_train, new_bags)
+            new_fitness = self.calculate_fitness(models)
             
             if X_for_test is not None and y_for_test is not None:
-                accuracy = evaluate(X_for_test, y_for_test, new_models)
+                accuracy = evaluate(X_for_test, y_for_test, models)
             else:
                 accuracy = None
             
-            if fitness == new_fitness:
-                print("Fitness is the same, skipping iteration")
-            
-            print(f"Iteration: {iteration}, Temperature: {T:.4f}, Best: {best_fitness:.4f}, Fitness: {fitness:.4f}, New Fitness: {new_fitness:.4f}, Accuracy: {accuracy:.4f}")
-            
-            if new_fitness > best_fitness:
-                best_models = new_models.copy()
+            if monitor_fun is not None:
+                monitor_fun(iteration, T, best_fitness, fitness, new_fitness, accuracy)
+    
+            if best_fitness < new_fitness:
+                best_models = models.copy()
                 best_fitness = new_fitness
-            
-            if new_fitness > fitness:
+    
+            if fitness < new_fitness:
                 fitness = new_fitness
-                models = new_models.copy()
+                bags = new_bags.copy()
+            elif fitness == new_fitness:
+                pass
             else:
-                delta = fitness - best_fitness
-                prob = np.exp(delta / T)
-                if random.random() < prob:
-                    models = new_models.copy()
+                threshold = random.random()
+                prob = self.calculate_probability(new_fitness, fitness, T)
+                if prob > threshold:
                     fitness = new_fitness
-                    
-                    
+                    bags = new_bags.copy()
                     
             T *= self.alpha
             iteration += 1

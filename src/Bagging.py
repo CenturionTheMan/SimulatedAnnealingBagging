@@ -37,6 +37,12 @@ class Bag:
 class BaggingModel:
     model: DecisionTreeClassifier
     bag: Bag
+    
+    def copy(self) -> "BaggingModel":
+        return BaggingModel(
+            model=DecisionTreeClassifier(**self.model.get_params()),
+            bag=self.bag.copy()
+        )
 
 
 def create_bag(X) -> Bag:
