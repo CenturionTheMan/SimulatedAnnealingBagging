@@ -66,6 +66,11 @@ class BaggingGA:
             # selected = np.random.choice(range(len(single.X_bin)), size=int(len(single.X_bin) * 0.01), replace=False)
             # single.X_bin[selected] = np.random.randint(0, 2, size=len(selected))
             single.X_bin[random_index] = not single.X_bin[random_index]
+            
+            random_index = random.randint(0, len(single.X_bin) - 1)
+            # selected = np.random.choice(range(len(single.X_bin)), size=int(len(single.X_bin) * 0.01), replace=False)
+            # single.X_bin[selected] = np.random.randint(0, 2, size=len(selected))
+            single.X_bin[random_index] = not single.X_bin[random_index]
         return population
     
     def crossover(self, population: List[Bag]) -> List[Bag]:
