@@ -38,8 +38,6 @@ class BaggingGA:
         
         accuracy_per_model = [accuracy_score(y_test, pred) for pred in predictions_per_model]
         disagreement_per_model = self.disagreement_measure(models, X_test)
-
-        alpha = 0.8
         size_ratio_per_model = [model.bag.size_ratio() for model in models]
         
         fitness_per_model = [ 
@@ -61,26 +59,6 @@ class BaggingGA:
         for i, single in enumerate(population):
             if random.random() >= self.mutation_rate:
                 continue
-            
-            random_index = random.randint(0, len(single.X_bin) - 1)
-            # selected = np.random.choice(range(len(single.X_bin)), size=int(len(single.X_bin) * 0.01), replace=False)
-            # single.X_bin[selected] = np.random.randint(0, 2, size=len(selected))
-            single.X_bin[random_index] = not single.X_bin[random_index]
-            
-            random_index = random.randint(0, len(single.X_bin) - 1)
-            # selected = np.random.choice(range(len(single.X_bin)), size=int(len(single.X_bin) * 0.01), replace=False)
-            # single.X_bin[selected] = np.random.randint(0, 2, size=len(selected))
-            single.X_bin[random_index] = not single.X_bin[random_index]
-        return population
-    
-    def crossover(self, population: List[Bag]) -> List[Bag]:
-        for i in range(0, len(population), 2):
-            if random.random() >= self.crossover_rate:
-                continue
-            crossover_point = random.randint(0, len(population[0].X_bin) - 1)
-            tmp = population[i].X_bin[:crossover_point].copy()
-            population[i].X_bin[:crossover_point] = population[i + 1].X_bin[:crossover_point]
-            population[i + 1].X_bin[:crossover_point] = tmp
             mutation_point = random.randint(0, len(single.features) - 1)
             new_feature = None
             while new_feature is None or new_feature in single.features:

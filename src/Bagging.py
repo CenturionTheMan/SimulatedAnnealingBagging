@@ -90,4 +90,3 @@ def evaluate(X, y, models: List[BaggingModel]) -> float:
 def evaluate_predictions(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     accuracy = accuracy_score(y_true, y_pred)
     return accuracy
-
