@@ -1,4 +1,5 @@
-from typing import List, Tuple
+import math
+from typing import List, Literal, Tuple
 from Bagging import Bag, BaggingModel, create_models, create_bags, evaluate
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
@@ -12,11 +13,10 @@ import random
 class BaggingSA:
     def __init__(self, 
                  X: np.ndarray, y: np.ndarray,
-                 T0: float, alpha:float, max_iterations: int, n_trees: int,
+                 T0: float, alpha: float, cooling_method: Literal['linear', 'geometric', 'logarithmic'], max_iterations: int, n_trees: int,
                  feature_mutation_chance: float = 0.1, test_split_amount: int = 10,
                  ):
         self.T0 = T0
-        self.alpha = alpha
         self.n_trees = n_trees
         self.max_iterations = max_iterations
         self.feature_mutation_chance = feature_mutation_chance
@@ -27,6 +27,8 @@ class BaggingSA:
         self.sub_groups_X_test = np.array_split(X_test, self.test_split_amount)
         self.sub_groups_y_test = np.array_split(y_test, self.test_split_amount)
         self.features = X.shape[1]
+        self.alpha = alpha
+        self.cooling_method = cooling_method
         
     def calculate_fitness(self, models: List[BaggingModel]) -> float:
         acc_sum = 0
@@ -74,8 +76,6 @@ class BaggingSA:
         
         return list(best_bags), list(best_models), fitness
 
-        
-    
     def calculate_probability(self, newFitness: float, oldFitness: float, temperature: float) -> float:
         diff = newFitness - oldFitness
         if diff / temperature > 709:
@@ -83,6 +83,17 @@ class BaggingSA:
         else:
             prob = np.exp(diff / temperature)
         return prob
+
+    def calculate_temperature(self, method: str, T: float, iteration: int) -> float:
+        if method == 'linear':
+            return T - self.alpha
+        elif method == 'geometric':
+            return T * self.alpha
+        elif method == 'logarithmic':
+            return self.alpha / math.log(iteration + 1)
+        else:
+            raise ValueError("Invalid temperature calculation method.")
+        
     
     def run(self, X_for_test = None, y_for_test = None, monitor_fun = None) -> List[BaggingModel]:
         T = self.T0
@@ -92,9 +103,9 @@ class BaggingSA:
         best_models = models.copy()
         best_fitness = fitness
         
-        iteration = 0
+        iteration = 1
         
-        while T > 1e-10 and iteration < self.max_iterations:
+        while T > 1e-10 and iteration <= self.max_iterations:
             new_bags = self.get_neighbors(bags)
             models = create_models(self.X_train, self.y_train, new_bags)
             new_fitness = self.calculate_fitness(models)
@@ -123,7 +134,7 @@ class BaggingSA:
                     fitness = new_fitness
                     bags = new_bags.copy()
                     
-            T *= self.alpha
+            T = self.calculate_temperature(self.cooling_method, T, iteration)
             iteration += 1
         
         return best_models
