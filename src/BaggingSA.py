@@ -1,6 +1,6 @@
 import math
 from typing import List, Literal, Tuple
-from Bagging import Bag, BaggingModel, create_models, create_bags, evaluate
+from Bagging import Bag, BaggingModel, create_models, create_bags, evaluate, predict
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 from sklearn import datasets
@@ -30,16 +30,30 @@ class BaggingSA:
         self.alpha = alpha
         self.cooling_method = cooling_method
         
+    def disagreement_measure(self, models: List[BaggingModel], X_test: np.ndarray) -> float:
+        disagreement_sum = 0.0
+        pop_predictions = predict(X_test, models)
+        
+        for model in models:
+            model_predictions = model.model.predict(X_test[:,model.bag.features])
+            disagreement_sum += np.sum(pop_predictions != model_predictions) / len(model_predictions)
+        return disagreement_sum / len(models)
+        
     def calculate_fitness(self, models: List[BaggingModel]) -> float:
         acc_sum = 0
+        disagreement_sum = 0
         for i in range(self.test_split_amount):
-            sub_X = self.sub_groups_X_test[i]
-            sub_y = self.sub_groups_y_test[i]
+            sub_X, sub_y = self.sub_groups_X_test[i], self.sub_groups_y_test[i]
             
-            accuracy = evaluate(X=sub_X, y=sub_y, models=models)
-            acc_sum += accuracy
+            acc_sum += evaluate(X=sub_X, y=sub_y, models=models)
+            disagreement_sum += self.disagreement_measure(models, sub_X)
+            
         accuracy = acc_sum / self.test_split_amount
-        return accuracy
+        disagreement = disagreement_sum / self.test_split_amount
+        
+        alpha = 0.8
+        fitness = (alpha * accuracy) + ((1-alpha) * disagreement)
+        return fitness
     
     def get_neighbors(self, population: List[Bag]) -> List[BaggingModel]:
         bags = [single.copy() for single in population]
