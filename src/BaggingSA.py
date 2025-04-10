@@ -51,7 +51,7 @@ class BaggingSA:
         accuracy = acc_sum / self.test_split_amount
         disagreement = disagreement_sum / self.test_split_amount
         
-        alpha = 0.8
+        alpha = 0.9
         fitness = (alpha * accuracy) + ((1-alpha) * disagreement)
         return fitness
     
