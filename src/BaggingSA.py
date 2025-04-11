@@ -14,6 +14,7 @@ class BaggingSA:
     def __init__(self, 
                  X: np.ndarray, y: np.ndarray,
                  T0: float, alpha: float, cooling_method: Literal['linear', 'geometric', 'logarithmic'], max_iterations: int, n_trees: int,
+                 fitness_accuracy_disagreement_ratio: float = 0.9,
                  feature_mutation_chance: float = 0.1, test_split_amount: int = 10,
                  ):
         self.T0 = T0
@@ -29,6 +30,7 @@ class BaggingSA:
         self.features = X.shape[1]
         self.alpha = alpha
         self.cooling_method = cooling_method
+        self.fitness_accuracy_disagreement_ratio = fitness_accuracy_disagreement_ratio
         
     def disagreement_measure(self, models: List[BaggingModel], X_test: np.ndarray) -> float:
         disagreement_sum = 0.0
@@ -51,7 +53,7 @@ class BaggingSA:
         accuracy = acc_sum / self.test_split_amount
         disagreement = disagreement_sum / self.test_split_amount
         
-        alpha = 0.9
+        alpha = self.fitness_accuracy_disagreement_ratio
         fitness = (alpha * accuracy) + ((1-alpha) * disagreement)
         return fitness
     
