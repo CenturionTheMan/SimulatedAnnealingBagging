@@ -90,3 +90,11 @@ def evaluate(X, y, models: List[BaggingModel]) -> float:
 def evaluate_predictions(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     accuracy = accuracy_score(y_true, y_pred)
     return accuracy
+
+
+
+def q_statistic_for_ensemble(X: np.ndarray, y: np.ndarray, models: List[BaggingModel]) -> float:
+    predictions = [model.model.predict(X[:,model.bag.features]) for model in models ]
+    predictions = [p == y for p in predictions]
+    predictions = np.array(predictions)
+    print(predictions)    
