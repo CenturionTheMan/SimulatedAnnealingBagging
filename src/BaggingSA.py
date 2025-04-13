@@ -1,6 +1,6 @@
 import math
 from typing import List, Literal, Tuple
-from Bagging import Bag, BaggingModel, create_models, create_bags, evaluate, predict
+from Bagging import Bag, BaggingModel, create_models, create_bags, evaluate, predict, q_statistic_for_ensemble
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 from sklearn import datasets
@@ -32,29 +32,32 @@ class BaggingSA:
         self.cooling_method = cooling_method
         self.fitness_accuracy_disagreement_ratio = fitness_accuracy_disagreement_ratio
         
-    def disagreement_measure(self, models: List[BaggingModel], X_test: np.ndarray) -> float:
-        disagreement_sum = 0.0
-        pop_predictions = predict(X_test, models)
+    # def disagreement_measure(self, models: List[BaggingModel], X_test: np.ndarray) -> float:
+    #     disagreement_sum = 0.0
+    #     pop_predictions = predict(X_test, models)
         
-        for model in models:
-            model_predictions = model.model.predict(X_test[:,model.bag.features])
-            disagreement_sum += np.sum(pop_predictions != model_predictions) / len(model_predictions)
-        return disagreement_sum / len(models)
+    #     for model in models:
+    #         model_predictions = model.model.predict(X_test[:,model.bag.features])
+    #         disagreement_sum += np.sum(pop_predictions != model_predictions) / len(model_predictions)
+    #     return disagreement_sum / len(models)
         
     def calculate_fitness(self, models: List[BaggingModel]) -> float:
         acc_sum = 0
-        disagreement_sum = 0
+        qstat_sum = 0
         for i in range(self.test_split_amount):
             sub_X, sub_y = self.sub_groups_X_test[i], self.sub_groups_y_test[i]
             
             acc_sum += evaluate(X=sub_X, y=sub_y, models=models)
-            disagreement_sum += self.disagreement_measure(models, sub_X)
+            qstat_sum += q_statistic_for_ensemble(X=sub_X, y=sub_y, models=models)
             
         accuracy = acc_sum / self.test_split_amount
-        disagreement = disagreement_sum / self.test_split_amount
+        
+        qstat = qstat_sum / self.test_split_amount
+        optimal_q, sigma = 0.2, 0.2
+        qstat = np.exp(-((qstat - optimal_q) ** 2) / (2 * sigma ** 2))
         
         alpha = self.fitness_accuracy_disagreement_ratio
-        fitness = (alpha * accuracy) + ((1-alpha) * disagreement)
+        fitness = (alpha * accuracy) + ((1-alpha) * qstat)
         return fitness
     
     def get_neighbors(self, population: List[Bag]) -> List[BaggingModel]:

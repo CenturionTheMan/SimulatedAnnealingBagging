@@ -93,8 +93,29 @@ def evaluate_predictions(y_true: np.ndarray, y_pred: np.ndarray) -> float:
 
 
 
-def q_statistic_for_ensemble(X: np.ndarray, y: np.ndarray, models: List[BaggingModel]) -> float:
-    predictions = [model.model.predict(X[:,model.bag.features]) for model in models ]
-    predictions = [p == y for p in predictions]
-    predictions = np.array(predictions)
-    print(predictions)    
+def q_statistic_for_ensemble(X: np.ndarray, y: np.ndarray, models: List['BaggingModel']) -> float:
+    predictions = np.array([
+        model.model.predict(X[:, model.bag.features]) == y
+        for model in models
+    ])  # (n_models, n_samples)
+
+    n_models = len(models)
+    q_values = []
+
+    for i in range(n_models):
+        for j in range(i + 1, n_models):
+            p1 = predictions[i]
+            p2 = predictions[j]
+
+            n11 = np.sum(p1 & p2)
+            n10 = np.sum(p1 & ~p2)
+            n01 = np.sum(~p1 & p2)
+            n00 = np.sum(~p1 & ~p2)
+
+            denominator = n11 * n00 + n10 * n01
+            if denominator == 0:
+                continue 
+            q = (n11 * n00 - n10 * n01) / denominator
+            q_values.append(q)
+
+    return float(np.mean(q_values)) if q_values else 0.0
