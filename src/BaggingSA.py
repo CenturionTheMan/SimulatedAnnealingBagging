@@ -25,27 +25,26 @@ class BaggingSA:
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=True)
         self.X_train = X_train
         self.y_train = y_train
-        self.sub_groups_X_test = np.array_split(X_test, self.test_split_amount)
-        self.sub_groups_y_test = np.array_split(y_test, self.test_split_amount)
+        self.rows_validate = [(X, y) for X, y in zip(X_test, y_test)]
         self.features = X.shape[1]
         self.alpha = alpha
         self.cooling_method = cooling_method
         self.fitness_accuracy_disagreement_ratio = fitness_accuracy_disagreement_ratio
+
+    def get_validate_sets(self):
+        random.shuffle(self.rows_validate)
+        X_test, y_test = zip(*self.rows_validate)
+        sub_groups_X_test = np.array_split(np.array(X_test), self.test_split_amount)
+        sub_groups_y_test = np.array_split(np.array(y_test), self.test_split_amount)
+        return sub_groups_X_test, sub_groups_y_test
         
-    # def disagreement_measure(self, models: List[BaggingModel], X_test: np.ndarray) -> float:
-    #     disagreement_sum = 0.0
-    #     pop_predictions = predict(X_test, models)
-        
-    #     for model in models:
-    #         model_predictions = model.model.predict(X_test[:,model.bag.features])
-    #         disagreement_sum += np.sum(pop_predictions != model_predictions) / len(model_predictions)
-    #     return disagreement_sum / len(models)
         
     def calculate_fitness(self, models: List[BaggingModel]) -> float:
+        sub_groups_X_test, sub_groups_y_test = self.get_validate_sets()
         acc_sum = 0
         qstat_sum = 0
         for i in range(self.test_split_amount):
-            sub_X, sub_y = self.sub_groups_X_test[i], self.sub_groups_y_test[i]
+            sub_X, sub_y = sub_groups_X_test[i], sub_groups_y_test[i]
             
             acc_sum += evaluate(X=sub_X, y=sub_y, models=models)
             qstat_sum += q_statistic_for_ensemble(X=sub_X, y=sub_y, models=models)
@@ -81,8 +80,10 @@ class BaggingSA:
         bags = create_bags(self.X_train, amount)
         models = create_models(self.X_train, self.y_train, bags)
         
+        sub_groups_X_test, sub_groups_y_test = self.get_validate_sets()
+        
         mean_accuracy = []
-        for X_test, y_test in zip(self.sub_groups_X_test, self.sub_groups_y_test):
+        for X_test, y_test in zip(sub_groups_X_test, sub_groups_y_test):
             predictions_per_model = [model.model.predict(X_test[:,model.bag.features]) for model in models]
             accuracy_per_model = [accuracy_score(y_test, pred) for pred in predictions_per_model]
             mean_accuracy.append(accuracy_per_model)

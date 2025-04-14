@@ -1,0 +1,4 @@
+dataset,kCrossIndex,fadr,fmc,accuracy
+abalone,0,0.6,0.1,0.1507177033492823
+abalone,1,0.6,0.1,0.08373205741626795
+abalone,2,0.6,0.1,0.3397129186602871
