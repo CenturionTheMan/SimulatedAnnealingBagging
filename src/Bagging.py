@@ -29,9 +29,9 @@ class Bag:
     
     def copy(self) -> "Bag":
         return Bag(
-            X_bin=deepcopy(self.X_bin),
-            y_bin=deepcopy(self.y_bin),
-            features=deepcopy(self.features)
+            X_bin=self.X_bin.copy(),
+            y_bin=self.y_bin.copy(),
+            features=self.features.copy()
         )
 
 @dataclass
