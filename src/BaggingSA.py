@@ -1,6 +1,6 @@
 import math
 from typing import List, Literal, Tuple
-from Bagging import Bag, BaggingModel, create_models, create_bags, evaluate, predict, q_statistic_for_ensemble
+from Bagging import Bag, BaggingModel, create_models, create_bags, evaluate, predict, q_statistic_for_ensemble, q_statistic_for_ensemble_fast
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 from sklearn import datasets
@@ -8,6 +8,9 @@ from sklearn.tree import DecisionTreeClassifier
 import numpy as np
 import pandas as pd
 import random
+from functools import wraps
+import time
+from concurrent.futures import ThreadPoolExecutor
 
 
 class BaggingSA:
@@ -38,7 +41,6 @@ class BaggingSA:
         sub_groups_y_test = np.array_split(np.array(y_test), self.test_split_amount)
         return sub_groups_X_test, sub_groups_y_test
         
-        
     def calculate_fitness(self, models: List[BaggingModel]) -> float:
         sub_groups_X_test, sub_groups_y_test = self.get_validate_sets()
         acc_sum = 0
@@ -47,7 +49,7 @@ class BaggingSA:
             sub_X, sub_y = sub_groups_X_test[i], sub_groups_y_test[i]
             
             acc_sum += evaluate(X=sub_X, y=sub_y, models=models)
-            qstat_sum += q_statistic_for_ensemble(X=sub_X, y=sub_y, models=models)
+            qstat_sum += q_statistic_for_ensemble_fast(X=sub_X, y=sub_y, models=models)
             
         accuracy = acc_sum / self.test_split_amount
         
@@ -126,6 +128,8 @@ class BaggingSA:
         iteration = 1
         
         while T > 1e-10 and iteration <= self.max_iterations:
+            time_start = time.time()
+            
             new_bags = self.get_neighbors(bags)
             models = create_models(self.X_train, self.y_train, new_bags)
             new_fitness = self.calculate_fitness(models)
@@ -156,6 +160,9 @@ class BaggingSA:
                     
             T = self.calculate_temperature(self.cooling_method, T, iteration)
             iteration += 1
+            
+            time_end = time.time()
+            print(f"Time taken for iteration {iteration}: {time_end - time_start:.4f} seconds")
         
         return best_models
         

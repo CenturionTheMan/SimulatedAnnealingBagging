@@ -1,4 +1,5 @@
 from copy import deepcopy
+from itertools import combinations
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
@@ -119,3 +120,34 @@ def q_statistic_for_ensemble(X: np.ndarray, y: np.ndarray, models: List['Bagging
             q_values.append(q)
 
     return float(np.mean(q_values)) if q_values else 0.0
+
+
+def q_statistic_for_ensemble_fast(X: np.ndarray, y: np.ndarray, models: List['BaggingModel']) -> float:
+    # Step 1: Generate all predictions as a binary matrix (correct = 1, incorrect = 0)
+    n_models = len(models)
+    n_samples = len(y)
+    correct_matrix = np.empty((n_models, n_samples), dtype=bool)
+
+    for idx, model in enumerate(models):
+        preds = model.model.predict(X[:, model.bag.features])
+        correct_matrix[idx] = preds == y
+
+    # Step 2: Compute pairwise Q-statistics
+    q_stats = []
+    for i, j in combinations(range(n_models), 2):
+        c_i = correct_matrix[i]
+        c_j = correct_matrix[j]
+
+        n11 = np.count_nonzero(c_i & c_j)
+        n00 = np.count_nonzero(~c_i & ~c_j)
+        n10 = np.count_nonzero(c_i & ~c_j)
+        n01 = np.count_nonzero(~c_i & c_j)
+
+        denom = n11 * n00 + n10 * n01
+        if denom == 0:
+            continue
+
+        q = (n11 * n00 - n10 * n01) / denom
+        q_stats.append(q)
+
+    return float(np.mean(q_stats)) if q_stats else 0.0
