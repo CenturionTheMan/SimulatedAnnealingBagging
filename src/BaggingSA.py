@@ -27,7 +27,7 @@ class BaggingSA:
     def __init__(self, 
                  X: np.ndarray, y: np.ndarray,
                  T0: float, alpha: float, cooling_method: Literal['linear', 'geometric', 'logarithmic'], max_iterations: int, n_trees: int,
-                 fitness_accuracy_disagreement_ratio: float = 0.9,
+                 fitness_accuracy_diversity_ratio: float = 0.9,
                  feature_mutation_chance: float = 0.1, test_split_amount: int = 10,
                  ):
         self.T0 = T0
@@ -42,7 +42,7 @@ class BaggingSA:
         self.features = X.shape[1]
         self.alpha = alpha
         self.cooling_method = cooling_method
-        self.fitness_accuracy_disagreement_ratio = fitness_accuracy_disagreement_ratio
+        self.fitness_accuracy_diversity_ratio = fitness_accuracy_diversity_ratio
 
     def get_validate_sets(self):
         random.shuffle(self.rows_validate)
@@ -64,11 +64,12 @@ class BaggingSA:
         accuracy = acc_sum / self.test_split_amount
         
         qstat = qstat_sum / self.test_split_amount
-        optimal_q, sigma = 0.2, 0.2
+        optimal_q, sigma = 0.15, 0.1
         qstat = np.exp(-((qstat - optimal_q) ** 2) / (2 * sigma ** 2))
         
-        alpha = self.fitness_accuracy_disagreement_ratio
+        alpha = self.fitness_accuracy_diversity_ratio
         fitness = (alpha * accuracy) + ((1-alpha) * qstat)
+        # print(  f"Accuracy: {accuracy:.3f} || Q-statistic [rescaled]: {qstat:.3f} || Q-statistic: {qstat_tmp:.3f} || Fitness: {fitness:.3f}")
         return fitness
     
     def get_neighbors(self, population: List[Bag]) -> List[BaggingModel]:
@@ -127,7 +128,7 @@ class BaggingSA:
             raise ValueError("Invalid temperature calculation method.")
         
     
-    def run(self, X_for_test = None, y_for_test = None, monitor_fun = None) -> List[BaggingModel]:
+    def run(self, X_for_test = None, y_for_test = None, monitor_fun = None, get_fitness = False) -> List[BaggingModel]:
         T = self.T0
         
         bags, models, fitness = self.get_initial_population()
@@ -168,5 +169,8 @@ class BaggingSA:
             T = self.calculate_temperature(self.cooling_method, T, iteration)
             iteration += 1
         
-        return best_models
+        if get_fitness:
+            return best_models, best_fitness
+        else:
+            return best_models
         
