@@ -151,7 +151,7 @@ class BaggingSA:
                 monitor_fun(iteration, T, best_fitness, fitness, new_fitness, accuracy)
     
             if best_fitness < new_fitness:
-                best_models = models
+                best_models = models.copy()
                 best_fitness = new_fitness
     
             if fitness < new_fitness:
