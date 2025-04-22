@@ -62,44 +62,53 @@ class BaggingSA:
         return accuracy
     
     def get_neighbors(self, population: List[Bag]) -> List[Bag]:
+        def should_add_feature(features_len: int) -> bool:
+            if self.features_amount <= features_len:
+                return False
+            elif int(np.sqrt(self.features_amount)) >= features_len:
+                return True
+            return random.random() < 0.5
+
+        def should_add_sample(current_size: int) -> bool:
+            if len(self.X_train) <= current_size:
+                return False
+            elif int(len(self.X_train) / 2) >= current_size:
+                return False
+            return random.random() < 0.5
+
         bags = [single.copy() for single in population]
+
         for single in bags:
-            is_feature_mutation = random.random() < self.feature_mutation_chance
-            
-            if is_feature_mutation:
-                if self.features_amount <= len(single.features):
-                    is_add = False
-                elif int(np.sqrt(self.features_amount)) >= len(single.features):
-                    is_add = True
-                else:
-                    is_add = random.random() < 0.5
-                    
+            if random.random() < self.feature_mutation_chance:
+                # Feature mutation
+                is_add = should_add_feature(len(single.features))
+                
                 if is_add:
-                    to_select = list(set(range(self.features_amount)) - set(single.features))
-                    to_add = random.sample(to_select, 1)
-                    single.features = np.hstack([single.features, to_add])   
-                else:
-                    to_remove = random.sample(list(single.features), 1)
-                    single.features = np.setdiff1d(single.features, to_remove)
+                    available = list(set(range(self.features_amount)) - set(single.features))
+                    if available:  # Safety check
+                        to_add = random.choice(available)
+                        single.features = np.append(single.features, to_add)
+                elif len(single.features) > 1:
+                    to_remove = random.choice(single.features)
+                    single.features = np.setdiff1d(single.features, [to_remove])
             else:
-                if len(self.X_train) <= single.count_samples():
-                    is_add = False
-                elif int(len(self.X_train) / 2) >= single.count_samples():
-                    is_add = False
-                else:
-                    is_add = random.random() < 0.5
-                    
+                # Sample mutation
+                current_size = single.count_samples()
+                is_add = should_add_sample(current_size)
+
                 if is_add:
                     to_add = random.randint(0, len(self.X_train) - 1)
                     add_X = self.X_train[to_add].reshape(1, -1)
                     add_y = self.y_train[to_add].reshape(1,)
-                    single.X = np.vstack([single.X, add_X])
-                    single.y = np.hstack([single.y, add_y])
+                    single.X = np.concatenate([single.X, add_X], axis=0)
+                    single.y = np.concatenate([single.y, add_y], axis=0)
                 elif len(single.X) > 1:
                     to_remove = random.randint(0, len(single.X) - 1)
                     single.X = np.delete(single.X, to_remove, axis=0)
                     single.y = np.delete(single.y, to_remove, axis=0)
+
         return bags
+
     
     def get_initial_population(self) -> Tuple[List[Bag], List[BaggingModel], float]:
         tmp_bags = create_bags(self.X_train, self.y_train, self.n_trees, replace=True, cut_features=False)
