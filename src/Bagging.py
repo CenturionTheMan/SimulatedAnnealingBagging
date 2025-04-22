@@ -12,26 +12,29 @@ from typing import List, Dict, Any
     
 @dataclass
 class Bag:
-    X_bin: np.ndarray[np.bool]
-    y_bin: np.ndarray[np.bool]
-    features: List[int]
+    X: np.ndarray[np.bool]
+    y: np.ndarray[np.bool]
+    features: List[int] | None
     
-    def get_mapped_data(self, X, y) -> Tuple[np.ndarray, np.ndarray]:
-        X_mapped = X[self.X_bin][:, self.features]
-        y_mapped = y[self.X_bin]
+    def get_mapped_data(self) -> Tuple[np.ndarray, np.ndarray]:
+        X_mapped = self.X[:, self.features] if self.features is not None else self.X
+        y_mapped = self.y
         return X_mapped, y_mapped
     
+    def map_X_by_features(self, X_out):
+        return X_out if self.features is None else X_out[:, self.features]
+            
     def count_samples(self) -> int:
-        return np.sum(self.X_bin)   
+        return len(self.X)   
     
-    def size_ratio(self) -> float:
-        return self.count_samples() / len(self.X_bin)
+    # def size_ratio(self) -> float:
+    #     return self.count_samples() / len(self.X_bin)
     
     def copy(self) -> "Bag":
         return Bag(
-            X_bin=self.X_bin.copy(),
-            y_bin=self.y_bin.copy(),
-            features=self.features.copy()
+            X=self.X.copy(),
+            y=self.y.copy(),
+            features=None if self.features is None else self.features.copy()
         )
 
 @dataclass
@@ -46,39 +49,43 @@ class BaggingModel:
         )
 
 
-def create_bag(X) -> Bag:
-    indices = np.random.choice(range(len(X)), size=int(len(X)/2), replace=False)
+def create_bag(X, y, replace:bool, cut_features:bool) -> Bag:
+    if replace:
+        indices = np.random.choice(range(len(X)), size=len(X), replace=True)
+    else:
+        indices = np.random.choice(range(len(X)), size=int(len(X)*0.5), replace=False)
 
-    X_bin = np.zeros(len(X), dtype=bool)
-    X_bin[indices] = True
-    y_bin = np.zeros(len(X), dtype=bool)
-    y_bin[indices] = True
-    
-    data_features_amount = X.shape[1]
-    features = np.random.choice(
-            range(data_features_amount),
-            size=int(np.sqrt(data_features_amount)), 
-            replace=False
-        )
-    bag = Bag(X_bin, y_bin, features)
+    tmp_X = X[indices].copy()
+    tmp_y = y[indices].copy()
+
+    if cut_features:
+        data_features_amount = X.shape[1]
+        features = np.random.choice(
+                range(data_features_amount),
+                size=int(np.sqrt(data_features_amount)), 
+                replace=False
+            )
+    else:
+        features = list(range(X.shape[1]))
+    bag = Bag(tmp_X, tmp_y, features)
     return bag
 
-def create_bags(X, bags_amount: int) -> List[Bag]:
-    bags = [create_bag(X) for _ in range(bags_amount)]
+def create_bags(X, y, bags_amount: int, replace:bool=True, cut_features:bool=False) -> List[Bag]:
+    bags = [create_bag(X, y, replace=replace, cut_features=cut_features) for _ in range(bags_amount)]
     return bags
 
-def create_model(X, y, bag: Bag) -> BaggingModel:
-    X_mapped, y_mapped = bag.get_mapped_data(X, y)
-    model = DecisionTreeClassifier(max_depth=None, min_samples_split=2)
+def create_model(bag: Bag) -> BaggingModel:
+    X_mapped, y_mapped = bag.get_mapped_data()
+    model = DecisionTreeClassifier()
     model.fit(X_mapped, y_mapped)
     return BaggingModel(model, bag)
 
-def create_models(X, y, bags: List[Bag]) -> List[BaggingModel]:
-    models = [create_model(X, y, bag) for bag in bags]
+def create_models(bags: List[Bag]) -> List[BaggingModel]:
+    models = [create_model(bag) for bag in bags]
     return models
 
 def predict(X, models: List[BaggingModel]) -> np.ndarray:
-    predictions = [ model.model.predict(X[:,model.bag.features]) for model in models ]
+    predictions = [ model.model.predict(model.bag.map_X_by_features(X)) for model in models ]
     predictions = np.array(predictions)
     final_predictions = [np.bincount(pred).argmax() for pred in predictions.T]
     return np.array(final_predictions)
@@ -100,7 +107,7 @@ def q_statistic_for_ensemble(X: np.ndarray, y: np.ndarray, models: List['Bagging
     correct_matrix = np.empty((n_models, n_samples), dtype=bool)
 
     for idx, model in enumerate(models):
-        preds = model.model.predict(X[:, model.bag.features])
+        preds = model.model.predict(model.bag.map_X_by_features(X))
         correct_matrix[idx] = preds == y
 
     # Step 2: Compute pairwise Q-statistics

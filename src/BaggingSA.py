@@ -1,3 +1,4 @@
+from copy import deepcopy
 import math
 from typing import List, Literal, Tuple
 from Bagging import Bag, BaggingModel, create_models, create_bags, evaluate, predict, q_statistic_for_ensemble
@@ -27,7 +28,6 @@ class BaggingSA:
     def __init__(self, 
                  X: np.ndarray, y: np.ndarray,
                  T0: float, alpha: float, cooling_method: Literal['linear', 'geometric', 'logarithmic'], max_iterations: int, n_trees: int,
-                 fitness_accuracy_diversity_ratio: float = 0.9,
                  feature_mutation_chance: float = 0.1, test_split_amount: int = 10,
                  ):
         self.T0 = T0
@@ -39,10 +39,9 @@ class BaggingSA:
         self.X_train = X_train
         self.y_train = y_train
         self.rows_validate = [(X, y) for X, y in zip(X_test, y_test)]
-        self.features = X.shape[1]
+        self.features_amount = X.shape[1]
         self.alpha = alpha
         self.cooling_method = cooling_method
-        self.fitness_accuracy_diversity_ratio = fitness_accuracy_diversity_ratio
 
     def get_validate_sets(self):
         random.shuffle(self.rows_validate)
@@ -54,65 +53,59 @@ class BaggingSA:
     def calculate_fitness(self, models: List[BaggingModel]) -> float:
         sub_groups_X_test, sub_groups_y_test = self.get_validate_sets()
         acc_sum = 0
-        qstat_sum = 0
+        
         for i in range(self.test_split_amount):
             sub_X, sub_y = sub_groups_X_test[i], sub_groups_y_test[i]
-            
             acc_sum += evaluate(X=sub_X, y=sub_y, models=models)
-            qstat_sum += q_statistic_for_ensemble(X=sub_X, y=sub_y, models=models)
             
         accuracy = acc_sum / self.test_split_amount
-        
-        qstat = qstat_sum / self.test_split_amount
-        optimal_q, sigma = 0.15, 0.1
-        qstat = np.exp(-((qstat - optimal_q) ** 2) / (2 * sigma ** 2))
-        
-        alpha = self.fitness_accuracy_diversity_ratio
-        fitness = (alpha * accuracy) + ((1-alpha) * qstat)
-        # print(  f"Accuracy: {accuracy:.3f} || Q-statistic [rescaled]: {qstat:.3f} || Q-statistic: {qstat_tmp:.3f} || Fitness: {fitness:.3f}")
-        return fitness
+        return accuracy
     
-    def get_neighbors(self, population: List[Bag]) -> List[BaggingModel]:
+    def get_neighbors(self, population: List[Bag]) -> List[Bag]:
         bags = [single.copy() for single in population]
         for single in bags:
             is_feature_mutation = random.random() < self.feature_mutation_chance
             
             if is_feature_mutation:
-                mutation_point = random.randint(0, len(single.features) - 1)
-                new_feature = None
-                while new_feature is None or new_feature in single.features:
-                    new_feature = random.randint(0, self.features - 1)
-                single.features[mutation_point] = new_feature
-            else:            
-                mutation_point = random.randint(0, len(single.X_bin) - 1)
-                single.X_bin[mutation_point] = not single.X_bin[mutation_point]
+                if self.features_amount <= len(single.features):
+                    is_add = False
+                elif int(np.sqrt(self.features_amount)) >= len(single.features):
+                    is_add = True
+                else:
+                    is_add = random.random() < 0.5
+                    
+                if is_add:
+                    to_select = list(set(range(self.features_amount)) - set(single.features))
+                    to_add = random.sample(to_select, 1)
+                    single.features = np.hstack([single.features, to_add])   
+                else:
+                    to_remove = random.sample(list(single.features), 1)
+                    single.features = np.setdiff1d(single.features, to_remove)
+            else:
+                if len(self.X_train) <= single.count_samples():
+                    is_add = False
+                elif int(len(self.X_train) / 2) >= single.count_samples():
+                    is_add = False
+                else:
+                    is_add = random.random() < 0.5
+                    
+                if is_add:
+                    to_add = random.randint(0, len(self.X_train) - 1)
+                    add_X = self.X_train[to_add].reshape(1, -1)
+                    add_y = self.y_train[to_add].reshape(1,)
+                    single.X = np.vstack([single.X, add_X])
+                    single.y = np.hstack([single.y, add_y])
+                elif len(single.X) > 1:
+                    to_remove = random.randint(0, len(single.X) - 1)
+                    single.X = np.delete(single.X, to_remove, axis=0)
+                    single.y = np.delete(single.y, to_remove, axis=0)
         return bags
     
     def get_initial_population(self) -> Tuple[List[Bag], List[BaggingModel], float]:
-        tmp_bags = create_bags(self.X_train, self.n_trees)
-        tmp_models = create_models(self.X_train, self.y_train, tmp_bags)     
+        tmp_bags = create_bags(self.X_train, self.y_train, self.n_trees, replace=True, cut_features=False)
+        tmp_models = create_models(tmp_bags)     
         tmp_fit = self.calculate_fitness(tmp_models)
         return tmp_bags, tmp_models, tmp_fit   
-        
-        amount = self.n_trees * 10
-        bags = create_bags(self.X_train, amount)
-        models = create_models(self.X_train, self.y_train, bags)
-        
-        sub_groups_X_test, sub_groups_y_test = self.get_validate_sets()
-        
-        mean_accuracy = []
-        for X_test, y_test in zip(sub_groups_X_test, sub_groups_y_test):
-            predictions_per_model = [model.model.predict(X_test[:,model.bag.features]) for model in models]
-            accuracy_per_model = [accuracy_score(y_test, pred) for pred in predictions_per_model]
-            mean_accuracy.append(accuracy_per_model)
-        
-        accuracy_per_model = np.mean(mean_accuracy, axis=0)
-        sorted_res = sorted(zip(bags, models, accuracy_per_model), key=lambda x: x[2], reverse=True)
-        best = sorted_res[:self.n_trees]
-        best_bags, best_models, best_accuracy = zip(*best)
-        fitness = self.calculate_fitness(best_models)
-        
-        return list(best_bags), list(best_models), fitness
 
     def calculate_probability(self, newFitness: float, oldFitness: float, temperature: float) -> float:
         diff = newFitness - oldFitness
@@ -145,7 +138,7 @@ class BaggingSA:
         
         while T > 1e-10 and iteration <= self.max_iterations and best_fitness < 1.0:
             new_bags = self.get_neighbors(bags)
-            models = create_models(self.X_train, self.y_train, new_bags)
+            models = create_models(new_bags)
             new_fitness = self.calculate_fitness(models)
             
             accuracy = None
