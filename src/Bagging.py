@@ -69,7 +69,7 @@ def create_bags(X, bags_amount: int) -> List[Bag]:
 
 def create_model(X, y, bag: Bag) -> BaggingModel:
     X_mapped, y_mapped = bag.get_mapped_data(X, y)
-    model = DecisionTreeClassifier()
+    model = DecisionTreeClassifier(max_depth=None, min_samples_split=2)
     model.fit(X_mapped, y_mapped)
     return BaggingModel(model, bag)
 

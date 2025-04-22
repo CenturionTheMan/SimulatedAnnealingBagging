@@ -143,7 +143,7 @@ class BaggingSA:
         
         iteration = 1
         
-        while T > 1e-10 and iteration <= self.max_iterations:
+        while T > 1e-10 and iteration <= self.max_iterations and best_fitness < 1.0:
             new_bags = self.get_neighbors(bags)
             models = create_models(self.X_train, self.y_train, new_bags)
             new_fitness = self.calculate_fitness(models)
