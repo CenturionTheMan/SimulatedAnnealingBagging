@@ -14,15 +14,16 @@ from typing import List, Dict, Any
 class Bag:
     X: np.ndarray[np.bool]
     y: np.ndarray[np.bool]
-    features: List[int] | None
+    features: List[int]
+    features_max_amount: int
     
     def get_mapped_data(self) -> Tuple[np.ndarray, np.ndarray]:
-        X_mapped = self.X[:, self.features] if self.features is not None else self.X
+        X_mapped = self.X if self.features_max_amount == len(self.features) else self.X[:, self.features]
         y_mapped = self.y
         return X_mapped, y_mapped
     
     def map_X_by_features(self, X_out):
-        return X_out if self.features is None else X_out[:, self.features]
+        return X_out if len(self.features) == self.features_max_amount else X_out[:, self.features]
             
     def count_samples(self) -> int:
         return len(self.X)   
@@ -34,7 +35,8 @@ class Bag:
         return Bag(
             X=self.X.copy(),
             y=self.y.copy(),
-            features=None if self.features is None else self.features.copy()
+            features=self.features.copy(),
+            features_max_amount=self.features_max_amount
         )
 
 @dataclass
@@ -67,7 +69,7 @@ def create_bag(X, y, replace:bool, cut_features:bool) -> Bag:
             )
     else:
         features = list(range(X.shape[1]))
-    bag = Bag(tmp_X, tmp_y, features)
+    bag = Bag(tmp_X, tmp_y, features, features_max_amount=X.shape[1])
     return bag
 
 def create_bags(X, y, bags_amount: int, replace:bool=True, cut_features:bool=False) -> List[Bag]:
