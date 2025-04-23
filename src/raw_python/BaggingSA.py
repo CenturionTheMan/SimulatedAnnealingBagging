@@ -28,7 +28,7 @@ class BaggingSA:
     def __init__(self, 
                  X: np.ndarray, y: np.ndarray,
                  T0: float, alpha: float, cooling_method: Literal['linear', 'geometric', 'logarithmic'], max_iterations: int, n_trees: int,
-                 feature_mutation_chance: float = 0.1, test_split_amount: int = 10,
+                 feature_mutation_chance: float, test_split_amount: int,
                  ):
         self.T0 = T0
         self.n_trees = n_trees
@@ -46,20 +46,21 @@ class BaggingSA:
     def get_validate_sets(self):
         random.shuffle(self.rows_validate)
         X_test, y_test = zip(*self.rows_validate)
+        
+        if self.test_split_amount <= 1:
+            return np.array([X_test]), np.array([y_test])
+        
         sub_groups_X_test = np.array_split(np.array(X_test), self.test_split_amount)
         sub_groups_y_test = np.array_split(np.array(y_test), self.test_split_amount)
         return sub_groups_X_test, sub_groups_y_test
         
     def calculate_fitness(self, models: List[BaggingModel]) -> float:
         sub_groups_X_test, sub_groups_y_test = self.get_validate_sets()
-        acc_sum = 0
-        
-        for i in range(self.test_split_amount):
-            sub_X, sub_y = sub_groups_X_test[i], sub_groups_y_test[i]
-            acc_sum += evaluate(X=sub_X, y=sub_y, models=models)
-            
-        accuracy = acc_sum / self.test_split_amount
-        return accuracy
+        accuracies = [
+            evaluate(X=sub_groups_X_test[i], y=sub_groups_y_test[i], models=models)
+            for i in range(self.test_split_amount)
+        ]
+        return np.mean(accuracies)
     
     def get_neighbors(self, population: List[Bag]) -> List[Bag]:
         def should_add_feature(features_len: int) -> bool:
@@ -109,7 +110,6 @@ class BaggingSA:
 
         return bags
 
-    
     def get_initial_population(self) -> Tuple[List[Bag], List[BaggingModel], float]:
         tmp_bags = create_bags(self.X_train, self.y_train, self.n_trees, replace=True, cut_features=False)
         tmp_models = create_models(tmp_bags)     
@@ -145,7 +145,7 @@ class BaggingSA:
         
         iteration = 1
         
-        while T > 1e-10 and iteration <= self.max_iterations and best_fitness < 1.0:
+        while iteration <= self.max_iterations and best_fitness < 1.0:
             new_bags = self.get_neighbors(bags)
             models = create_models(new_bags)
             new_fitness = self.calculate_fitness(models)
@@ -174,6 +174,9 @@ class BaggingSA:
                     bags = new_bags
                     
             T = self.calculate_temperature(self.cooling_method, T, iteration)
+            if T <= 1e-10:
+                T = 1e-10
+            
             iteration += 1
         
         if get_fitness:

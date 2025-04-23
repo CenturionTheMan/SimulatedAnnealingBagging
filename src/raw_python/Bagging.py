@@ -1,5 +1,8 @@
 from copy import deepcopy
+from functools import wraps
 from itertools import combinations
+import time
+from sklearn.calibration import Parallel, delayed
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
@@ -9,6 +12,16 @@ from typing import Tuple
 from dataclasses import dataclass
 from typing import List, Dict, Any
 
+def timeit(func):
+    @wraps(func)
+    def timeit_wrapper(*args, **kwargs):
+        start_time = time.perf_counter()
+        result = func(*args, **kwargs)
+        end_time = time.perf_counter()
+        total_time = end_time - start_time
+        print(f'Function {func.__name__} Took {total_time:.4f} seconds')
+        return result
+    return timeit_wrapper
     
 @dataclass
 class Bag:
@@ -82,9 +95,10 @@ def create_model(bag: Bag) -> BaggingModel:
     model.fit(X_mapped, y_mapped)
     return BaggingModel(model, bag)
 
-def create_models(bags: List[Bag]) -> List[BaggingModel]:
-    models = [create_model(bag) for bag in bags]
-    return models
+def create_models(bags: List[Bag], n_jobs: int = -1) -> List[BaggingModel]:
+    return Parallel(n_jobs=n_jobs)(
+        delayed(create_model)(bag) for bag in bags
+    )
 
 def predict(X, models: List[BaggingModel]) -> np.ndarray:
     predictions = [ model.model.predict(model.bag.map_X_by_features(X)) for model in models ]
