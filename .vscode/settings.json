@@ -1,3 +1,4 @@
 {
-  "cSpell.words": ["fadr", "gothrough", "qstat"]
+  "cSpell.words": ["fadr", "gothrough", "qstat"],
+  "python.analysis.extraPaths": ["./src/raw_python"]
 }
