@@ -1,7 +1,7 @@
 from copy import deepcopy
 import math
 from typing import List, Literal, Tuple
-from raw_python.Bagging import Bag, BaggingModel, create_models, create_bags, evaluate, predict, q_statistic_for_ensemble
+from raw_python.Bagging import Bag, BaggingModel, compute_disagreement, create_models, create_bags, evaluate, predict, q_statistic_for_ensemble
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 from sklearn import datasets
@@ -29,6 +29,7 @@ class BaggingSA:
                  X: np.ndarray, y: np.ndarray,
                  T0: float, alpha: float, cooling_method: Literal['linear', 'geometric', 'logarithmic'], max_iterations: int, n_trees: int,
                  feature_mutation_chance: float, test_split_amount: int,
+                 theta = 0.85, beta = 0.1, gamma = 0.05,
                  ):
         self.T0 = T0
         self.n_trees = n_trees
@@ -42,10 +43,18 @@ class BaggingSA:
         self.features_amount = X.shape[1]
         self.alpha = alpha
         self.cooling_method = cooling_method
+        self.classes = np.unique(y)
+        self.theta = theta
+        self.beta = beta
+        self.gamma = gamma
 
     def get_validate_sets(self):
         random.shuffle(self.rows_validate)
         X_test, y_test = zip(*self.rows_validate)
+        
+        # add noise to labels
+        y_test = np.array(y_test)
+        y_test = np.where(np.random.rand(len(y_test)) < 0.1, np.random.choice(self.classes, len(y_test)), y_test)
         
         if self.test_split_amount <= 1:
             return np.array([X_test]), np.array([y_test])
@@ -55,12 +64,46 @@ class BaggingSA:
         return sub_groups_X_test, sub_groups_y_test
         
     def calculate_fitness(self, models: List[BaggingModel]) -> float:
-        sub_groups_X_test, sub_groups_y_test = self.get_validate_sets()
-        accuracies = [
-            evaluate(X=sub_groups_X_test[i], y=sub_groups_y_test[i], models=models)
-            for i in range(self.test_split_amount)
-        ]
-        return np.mean(accuracies)
+        theta = self.theta
+        beta = self.beta
+        gamma = self.gamma
+        
+        if theta > 0:        
+            sub_groups_X_test, sub_groups_y_test = self.get_validate_sets()
+            accuracies = [
+                evaluate(X=sub_groups_X_test[i], y=sub_groups_y_test[i], models=models)
+                for i in range(self.test_split_amount)
+            ]
+            accuracy = np.mean(accuracies)
+        else:
+            accuracy = 0
+        
+        if beta > 0:
+            X_test, _ = zip(*self.rows_validate)
+            disagreement = compute_disagreement(X=np.array(X_test), models=models)
+        else:
+            disagreement = 0
+
+        if gamma > 0:
+            complexities = np.array([
+                0.3 * min(len(m.bag.features), self.features_amount) / max(len(m.bag.features), self.features_amount) +
+                0.7 * min(m.bag.count_samples(), len(self.X_train)) / max(m.bag.count_samples(), len(self.X_train))
+                for m in models
+            ])
+            complexity = 1 - complexities.mean()
+        else:
+            complexity = 0
+        
+        accuracy = accuracy * theta
+        disagreement = disagreement*beta
+        complexity = complexity*gamma
+        
+        fitness = accuracy + disagreement - complexity
+        
+        #print(f"   Acc: {accuracy:.4f}, Dis: {disagreement:.4f}, Com: {complexity:.4f} => Fit: {fitness:.4f}")
+        
+        return fitness
+    
     
     def get_neighbors(self, population: List[Bag]) -> List[Bag]:
         def should_add_feature(features_len: int) -> bool:
@@ -145,7 +188,7 @@ class BaggingSA:
         
         iteration = 1
         
-        while iteration <= self.max_iterations and best_fitness < 1.0:
+        while iteration <= self.max_iterations:
             new_bags = self.get_neighbors(bags)
             models = create_models(new_bags)
             new_fitness = self.calculate_fitness(models)
@@ -164,8 +207,6 @@ class BaggingSA:
             if fitness < new_fitness:
                 fitness = new_fitness
                 bags = new_bags
-            elif fitness == new_fitness:
-                pass
             else:
                 threshold = random.random()
                 prob = self.calculate_probability(new_fitness, fitness, T)

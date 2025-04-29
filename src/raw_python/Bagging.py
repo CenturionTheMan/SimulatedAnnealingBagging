@@ -63,6 +63,10 @@ class BaggingModel:
             bag=self.bag.copy()
         )
 
+@dataclass
+class Ensemble:
+    models: List[BaggingModel]
+    output_ratios: np.ndarray
 
 def create_bag(X, y, replace:bool, cut_features:bool) -> Bag:
     if replace:
@@ -99,6 +103,20 @@ def create_models(bags: List[Bag], n_jobs: int = -1) -> List[BaggingModel]:
     return Parallel(n_jobs=n_jobs)(
         delayed(create_model)(bag) for bag in bags
     )
+    
+def create_ensemble(bags: List[Bag], n_jobs: int = -1) -> Ensemble:
+    models = Parallel(n_jobs=n_jobs)(
+        delayed(create_model)(bag) for bag in bags
+    )
+    output_ratios = np.ones_like(models, dtype=float) / len(models)
+    return Ensemble(models=models, output_ratios=output_ratios)
+
+def predict_ensemble(X, ensemble: Ensemble):
+    predictions = [ model.model.predict(model.bag.map_X_by_features(X)) for model in ensemble.models ]
+    predictions = np.array(predictions)
+    final_predictions = [np.bincount(x=pred, weights=ensemble.output_ratios).argmax() for pred in predictions.T]
+    return np.array(final_predictions)
+    
 
 def predict(X, models: List[BaggingModel]) -> np.ndarray:
     predictions = [ model.model.predict(model.bag.map_X_by_features(X)) for model in models ]
@@ -111,10 +129,39 @@ def evaluate(X, y, models: List[BaggingModel]) -> float:
     accuracy = accuracy_score(y, predictions)
     return accuracy
 
+def evaluate_ensemble(X, y, ensemble: Ensemble) -> float:
+    predictions = predict_ensemble(X, ensemble)
+    accuracy = accuracy_score(y, predictions)
+    return accuracy
+
 def evaluate_predictions(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     accuracy = accuracy_score(y_true, y_pred)
     return accuracy
 
+
+def compute_disagreement(X: np.ndarray, models: List[BaggingModel]) -> float:
+    n_models = len(models)
+    all_preds = []
+
+    # Step 1: Predict once for each model
+    for model in models:
+        preds = model.model.predict(model.bag.map_X_by_features(X))
+        all_preds.append(preds)
+    
+    all_preds = np.array(all_preds)  # Shape: (n_models, n_samples)
+
+    # Step 2: Compute disagreements only for i < j
+    disagreements = []
+    for i in range(n_models):
+        for j in range(i + 1, n_models):
+            disagreement_rate = np.mean(all_preds[i] != all_preds[j])
+            disagreements.append(disagreement_rate)
+
+    # Step 3: Return the mean disagreement across all pairs
+    return np.mean(disagreements)
+    
+
+    
 
 def q_statistic_for_ensemble(X: np.ndarray, y: np.ndarray, models: List['BaggingModel']) -> float:
     # Step 1: Generate all predictions as a binary matrix (correct = 1, incorrect = 0)
