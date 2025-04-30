@@ -29,7 +29,7 @@ class BaggingSA:
                  X: np.ndarray, y: np.ndarray,
                  T0: float, alpha: float, cooling_method: Literal['linear', 'geometric', 'logarithmic'], max_iterations: int, n_trees: int,
                  feature_mutation_chance: float, test_split_amount: int,
-                 theta = 0.85, beta = 0.1, gamma = 0.05,
+                 theta: float, beta: float, gamma: float,
                  ):
         self.T0 = T0
         self.n_trees = n_trees
@@ -64,11 +64,7 @@ class BaggingSA:
         return sub_groups_X_test, sub_groups_y_test
         
     def calculate_fitness(self, models: List[BaggingModel]) -> float:
-        theta = self.theta
-        beta = self.beta
-        gamma = self.gamma
-        
-        if theta > 0:        
+        if self.theta > 0:        
             sub_groups_X_test, sub_groups_y_test = self.get_validate_sets()
             accuracies = [
                 evaluate(X=sub_groups_X_test[i], y=sub_groups_y_test[i], models=models)
@@ -78,13 +74,13 @@ class BaggingSA:
         else:
             accuracy = 0
         
-        if beta > 0:
+        if self.beta > 0:
             X_test, _ = zip(*self.rows_validate)
             disagreement = compute_disagreement(X=np.array(X_test), models=models)
         else:
             disagreement = 0
 
-        if gamma > 0:
+        if self.gamma > 0:
             complexities = np.array([
                 0.3 * min(len(m.bag.features), self.features_amount) / max(len(m.bag.features), self.features_amount) +
                 0.7 * min(m.bag.count_samples(), len(self.X_train)) / max(m.bag.count_samples(), len(self.X_train))
@@ -94,9 +90,9 @@ class BaggingSA:
         else:
             complexity = 0
         
-        accuracy = accuracy * theta
-        disagreement = disagreement*beta
-        complexity = complexity*gamma
+        accuracy = accuracy * self.theta
+        disagreement = disagreement* self.beta
+        complexity = complexity* self.gamma
         
         fitness = accuracy + disagreement - complexity
         
