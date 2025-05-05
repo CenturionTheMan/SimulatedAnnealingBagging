@@ -28,7 +28,9 @@ random.seed(seed)
 
 
 k_cross = 5
-reps = 5
+# reps = 5
+reps = 2
+
 datasets = ['digits','wine', 'breast_cancer', 'pima']
 par =  {
     'T0': 2,
@@ -43,9 +45,13 @@ par =  {
     'gamma': None,
 }
 
-theta_r = [0.25, 0.50, 0.75, 1.0]
-beta_r = [0.25, 0.50, 0.75, 1.0]
-gamma_r  = [0.25, 0.50, 0.75, 1.0]
+# theta_r = [0.25, 0.50, 0.75, 1.0]
+# beta_r = [0.25, 0.50, 0.75, 1.0]
+# gamma_r  = [0.25, 0.50, 0.75, 1.0]
+
+theta_r = [0.25, 0.50, 0.75]
+beta_r = [0.25, 0.50, 0.75]
+gamma_r  = [0.25, 0.50, 0.75]
 
 
 # In[ ]:

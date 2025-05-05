@@ -15,7 +15,7 @@ seed = 42
 
 k_cross = 5
 reps = 5
-n_trees = [10, 20, 30, 40, 50]
+n_trees_arr = [10, 20, 30, 40, 50]
 datasets = ['digits', 'wine', 'breast_cancer', 'pima']
 
 bagging_sa_params = {
@@ -153,7 +153,7 @@ for dataset in datasets:
     sub_groups_X = np.array_split(np.array(X), k_cross)
     sub_groups_y = np.array_split(np.array(y), k_cross) 
          
-    for n_tree in n_trees:
+    for n_tree in n_trees_arr:
         for rep in range(reps):
             for k in range(k_cross):
                 X_train = np.concatenate(sub_groups_X[:k] + sub_groups_X[k+1:])

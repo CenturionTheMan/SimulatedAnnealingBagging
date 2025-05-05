@@ -2,10 +2,11 @@ from copy import deepcopy
 from functools import wraps
 from itertools import combinations
 import time
+import pandas as pd
 from sklearn.calibration import Parallel, delayed
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, confusion_matrix, f1_score, precision_score, recall_score
 import numpy as np
 import random
 from typing import Tuple
@@ -70,7 +71,7 @@ class Ensemble:
 
 def create_bag(X, y, replace:bool, cut_features:bool) -> Bag:
     if replace:
-        indices = np.random.choice(range(len(X)), size=len(X), replace=True)
+        indices = np.random.randint(0, len(X), size=len(X))
     else:
         indices = np.random.choice(range(len(X)), size=int(len(X)*0.5), replace=False)
 
@@ -124,6 +125,23 @@ def predict(X, models: List[BaggingModel]) -> np.ndarray:
     final_predictions = [np.bincount(pred).argmax() for pred in predictions.T]
     return np.array(final_predictions)
 
+def evaluate_stats(X, y, models: List[BaggingModel], average='macro', return_arr:bool=False)-> pd.DataFrame:
+    y_pred = predict(X, models)
+    
+    result = {
+        'accuracy': accuracy_score(y, y_pred),
+        'precision': precision_score(y, y_pred, average=average),
+        'recall': recall_score(y, y_pred, average=average),
+        'f1': f1_score(y, y_pred, average=average),
+        'cm': confusion_matrix(y, y_pred),
+    }
+    
+    if return_arr:
+        return list(result.values())
+    else:
+        return result
+    
+
 def evaluate(X, y, models: List[BaggingModel]) -> float:
     predictions = predict(X, models)
     accuracy = accuracy_score(y, predictions)
@@ -143,28 +161,26 @@ def compute_disagreement(X: np.ndarray, models: List[BaggingModel]) -> float:
     n_models = len(models)
     all_preds = []
 
-    # Step 1: Predict once for each model
+    # get predictions per model
     for model in models:
         preds = model.model.predict(model.bag.map_X_by_features(X))
         all_preds.append(preds)
     
-    all_preds = np.array(all_preds)  # Shape: (n_models, n_samples)
+    all_preds = np.array(all_preds)  # (n_models, n_samples)
 
-    # Step 2: Compute disagreements only for i < j
+    # calc disagreements
     disagreements = []
     for i in range(n_models):
         for j in range(i + 1, n_models):
             disagreement_rate = np.mean(all_preds[i] != all_preds[j])
             disagreements.append(disagreement_rate)
 
-    # Step 3: Return the mean disagreement across all pairs
     return np.mean(disagreements)
     
 
     
 
 def q_statistic_for_ensemble(X: np.ndarray, y: np.ndarray, models: List['BaggingModel']) -> float:
-    # Step 1: Generate all predictions as a binary matrix (correct = 1, incorrect = 0)
     n_models = len(models)
     n_samples = len(y)
     correct_matrix = np.empty((n_models, n_samples), dtype=bool)
@@ -173,7 +189,6 @@ def q_statistic_for_ensemble(X: np.ndarray, y: np.ndarray, models: List['Bagging
         preds = model.model.predict(model.bag.map_X_by_features(X))
         correct_matrix[idx] = preds == y
 
-    # Step 2: Compute pairwise Q-statistics
     q_stats = []
     for i, j in combinations(range(n_models), 2):
         c_i = correct_matrix[i]

@@ -36,7 +36,7 @@ class BaggingSA:
         self.max_iterations = max_iterations
         self.feature_mutation_chance = feature_mutation_chance
         self.test_split_amount = test_split_amount
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=True)
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=True, stratify=y)
         self.X_train = X_train
         self.y_train = y_train
         self.rows_validate = [(X, y) for X, y in zip(X_test, y_test)]
