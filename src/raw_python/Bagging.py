@@ -12,6 +12,9 @@ import random
 from typing import Tuple
 from dataclasses import dataclass
 from typing import List, Dict, Any
+from collections import Counter
+
+rng = np.random.RandomState(42)
 
 def timeit(func):
     @wraps(func)
@@ -26,8 +29,8 @@ def timeit(func):
     
 @dataclass
 class Bag:
-    X: np.ndarray[np.bool]
-    y: np.ndarray[np.bool]
+    X: np.ndarray[np.bool_]
+    y: np.ndarray[np.bool_]
     features: List[int]
     features_max_amount: int
     
@@ -69,29 +72,16 @@ class Ensemble:
     models: List[BaggingModel]
     output_ratios: np.ndarray
 
-def create_bag(X, y, replace:bool, cut_features:bool) -> Bag:
-    if replace:
-        indices = np.random.randint(0, len(X), size=len(X))
-    else:
-        indices = np.random.choice(range(len(X)), size=int(len(X)*0.5), replace=False)
-
+def create_bag(X, y) -> Bag:
+    indices = rng.choice(len(X), size=len(X), replace=True)
     tmp_X = X[indices].copy()
     tmp_y = y[indices].copy()
-
-    if cut_features:
-        data_features_amount = X.shape[1]
-        features = np.random.choice(
-                range(data_features_amount),
-                size=int(np.sqrt(data_features_amount)), 
-                replace=False
-            )
-    else:
-        features = list(range(X.shape[1]))
+    features = list(range(X.shape[1]))
     bag = Bag(tmp_X, tmp_y, features, features_max_amount=X.shape[1])
     return bag
 
-def create_bags(X, y, bags_amount: int, replace:bool=True, cut_features:bool=False) -> List[Bag]:
-    bags = [create_bag(X, y, replace=replace, cut_features=cut_features) for _ in range(bags_amount)]
+def create_bags(X, y, bags_amount: int) -> List[Bag]:
+    bags = [create_bag(X, y) for _ in range(bags_amount)]
     return bags
 
 def create_model(bag: Bag) -> BaggingModel:
@@ -112,17 +102,32 @@ def create_ensemble(bags: List[Bag], n_jobs: int = -1) -> Ensemble:
     output_ratios = np.ones_like(models, dtype=float) / len(models)
     return Ensemble(models=models, output_ratios=output_ratios)
 
-def predict_ensemble(X, ensemble: Ensemble):
-    predictions = [ model.model.predict(model.bag.map_X_by_features(X)) for model in ensemble.models ]
-    predictions = np.array(predictions)
-    final_predictions = [np.bincount(x=pred, weights=ensemble.output_ratios).argmax() for pred in predictions.T]
-    return np.array(final_predictions)
-    
 
-def predict(X, models: List[BaggingModel]) -> np.ndarray:
-    predictions = [ model.model.predict(model.bag.map_X_by_features(X)) for model in models ]
+def majority_vote(labels: np.ndarray) -> int:
+    return Counter(labels).most_common(1)[0][0]
+
+def weighted_majority_vote(pred: np.ndarray, weights: np.ndarray, n_classes: int) -> int:
+    bincount = np.zeros(n_classes)
+    for label, weight in zip(pred, weights):
+        bincount[label] += weight
+    return bincount.argmax()
+
+def predict_ensemble(X: np.ndarray, ensemble: Ensemble) -> np.ndarray:
+    predictions = [model.model.predict(model.bag.map_X_by_features(X)) for model in ensemble.models]
+    predictions = np.array(predictions)  # shape: (n_models, n_samples)
+    
+    n_classes = max(model.model.n_classes_ for model in ensemble.models)
+    final_predictions = [
+        weighted_majority_vote(pred, ensemble.output_ratios, n_classes) for pred in predictions.T
+    ]
+    return np.array(final_predictions)
+
+def predict(X: np.ndarray, models: List[BaggingModel]) -> np.ndarray:
+    predictions = [model.model.predict(model.bag.map_X_by_features(X)) for model in models]
     predictions = np.array(predictions)
-    final_predictions = [np.bincount(pred).argmax() for pred in predictions.T]
+    final_predictions = [
+        majority_vote(pred) for pred in predictions.T
+    ]
     return np.array(final_predictions)
 
 def evaluate_stats(X, y, models: List[BaggingModel], average='macro', return_arr:bool=False)-> pd.DataFrame:

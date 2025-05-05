@@ -150,7 +150,7 @@ class BaggingSA:
         return bags
 
     def get_initial_population(self) -> Tuple[List[Bag], List[BaggingModel], float]:
-        tmp_bags = create_bags(self.X_train, self.y_train, self.n_trees, replace=True, cut_features=False)
+        tmp_bags = create_bags(self.X_train, self.y_train, self.n_trees)
         tmp_models = create_models(tmp_bags)     
         tmp_fit = self.calculate_fitness(tmp_models)
         return tmp_bags, tmp_models, tmp_fit   
