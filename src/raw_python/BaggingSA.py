@@ -29,7 +29,7 @@ class BaggingSA:
                  X: np.ndarray, y: np.ndarray,
                  T0: float, alpha: float, cooling_method: Literal['linear', 'geometric', 'logarithmic'], max_iterations: int, n_trees: int,
                  feature_mutation_chance: float, test_split_amount: int,
-                 theta: float, beta: float, gamma: float,
+                 beta: float, gamma: float, delta: float, epsilon: float
                  ):
         self.T0 = T0
         self.n_trees = n_trees
@@ -44,9 +44,10 @@ class BaggingSA:
         self.alpha = alpha
         self.cooling_method = cooling_method
         self.classes = np.unique(y)
-        self.theta = theta
         self.beta = beta
         self.gamma = gamma
+        self.delta = delta
+        self.epsilon = epsilon
 
     def get_validate_sets(self):
         random.shuffle(self.rows_validate)
@@ -54,17 +55,17 @@ class BaggingSA:
         
         # add noise to labels
         y_test = np.array(y_test)
-        y_test = np.where(np.random.rand(len(y_test)) < 0.1, np.random.choice(self.classes, len(y_test)), y_test)
+        y_test_noise = np.where(np.random.rand(len(y_test)) < self.delta, np.random.choice(self.classes, len(y_test)), y_test)
         
         if self.test_split_amount <= 1:
-            return np.array([X_test]), np.array([y_test])
+            return np.array([X_test]), np.array([y_test_noise])
         
         sub_groups_X_test = np.array_split(np.array(X_test), self.test_split_amount)
-        sub_groups_y_test = np.array_split(np.array(y_test), self.test_split_amount)
+        sub_groups_y_test = np.array_split(np.array(y_test_noise), self.test_split_amount)
         return sub_groups_X_test, sub_groups_y_test
         
     def calculate_fitness(self, models: List[BaggingModel]) -> float:
-        if self.theta > 0:        
+        if self.beta > 0:        
             sub_groups_X_test, sub_groups_y_test = self.get_validate_sets()
             accuracies = [
                 evaluate(X=sub_groups_X_test[i], y=sub_groups_y_test[i], models=models)
@@ -74,13 +75,13 @@ class BaggingSA:
         else:
             accuracy = 0
         
-        if self.beta > 0:
+        if self.gamma > 0:
             X_test, _ = zip(*self.rows_validate)
             disagreement = compute_disagreement(X=np.array(X_test), models=models)
         else:
             disagreement = 0
 
-        if self.gamma > 0:
+        if self.epsilon > 0:
             complexities = np.array([
                 0.3 * min(len(m.bag.features), self.features_amount) / max(len(m.bag.features), self.features_amount) +
                 0.7 * min(m.bag.count_samples(), len(self.X_train)) / max(m.bag.count_samples(), len(self.X_train))
@@ -90,9 +91,9 @@ class BaggingSA:
         else:
             complexity = 0
         
-        accuracy = accuracy * self.theta
-        disagreement = disagreement* self.beta
-        complexity = complexity* self.gamma
+        accuracy = accuracy * self.beta
+        disagreement = disagreement* self.gamma
+        complexity = complexity* self.epsilon
         
         fitness = accuracy + disagreement - complexity
         
