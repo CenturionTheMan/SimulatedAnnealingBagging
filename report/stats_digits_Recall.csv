@@ -1,0 +1,5 @@
+nTrees,Bagging: normality,SA: normality,Variance test,Comparison test,Result
+10,Shapiro: 0.646,Shapiro: 0.470,Levene (mean): 0.219,T-test (equal var): 0.334,H0 accepted
+20,Shapiro: 0.928,Shapiro: 0.004,Levene (median): 0.608,Mann-Whitney: 0.001,H0 rejected
+30,Shapiro: 0.541,Shapiro: 0.240,Levene (mean): 0.783,T-test (equal var): 0.000,H0 rejected
+40,Shapiro: 0.540,Shapiro: 0.337,Levene (mean): 0.706,T-test (equal var): 0.000,H0 rejected
