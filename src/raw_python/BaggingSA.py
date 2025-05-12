@@ -195,12 +195,12 @@ class BaggingSA:
             models = create_models(new_bags)
             new_fitness = self.calculate_fitness(models)
             
-            accuracy = None
+            eval_met = None
             if X_for_test is not None and y_for_test is not None:
-                accuracy = evaluate(X_for_test, y_for_test, models)
+                eval_met = evaluate_f1(X_for_test, y_for_test, models)
             
             if monitor_fun is not None:
-                monitor_fun(iteration, T, best_fitness, fitness, new_fitness, accuracy)
+                monitor_fun(iteration, T, best_fitness, fitness, new_fitness, eval_met)
     
             if best_fitness < new_fitness:
                 best_models = models.copy()

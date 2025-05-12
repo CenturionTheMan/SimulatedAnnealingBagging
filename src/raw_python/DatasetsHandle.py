@@ -45,6 +45,12 @@ def get_dataset(dataset_name: Literal['digits', 'wine', 'breast_cancer', 'pima',
         ds = pd.read_csv("./../datasets/students_dropout.csv", sep=';')
         label_encoder = LabelEncoder()
         ds["Target"] = label_encoder.fit_transform(ds["Target"])
+
+        #print labels with mapped values
+        print(label_encoder.classes_)
+        print(label_encoder.transform(label_encoder.classes_))
+        
+        
         X = ds.iloc[:,:-1].values
         sc = StandardScaler()
         X = sc.fit_transform(X)
@@ -55,9 +61,13 @@ def get_dataset(dataset_name: Literal['digits', 'wine', 'breast_cancer', 'pima',
         y_tmp = df["NObeyesdad"]
         X_tmp = df.drop("NObeyesdad", axis=1)
         X_encoded = X_tmp.copy()
+        label_encoder = LabelEncoder()
         for col in X_encoded.select_dtypes(include=['object']).columns:
-            X_encoded[col] = LabelEncoder().fit_transform(X_encoded[col])
-        y_encoded = LabelEncoder().fit_transform(y_tmp)
+            X_encoded[col] = label_encoder.fit_transform(X_encoded[col])
+        y_encoded = label_encoder.fit_transform(y_tmp)
+        #print labels with mapped values
+        print(label_encoder.classes_)
+        print(label_encoder.transform(label_encoder.classes_))
         y = y_encoded
         X = X_encoded.values        
     

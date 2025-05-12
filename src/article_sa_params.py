@@ -33,7 +33,7 @@ par =  {
     'max_iterations': 2000,
     'feature_mutation_chance': 0.25,
     'validation_split_amount': 5,
-    'n_trees': 10,
+    'n_trees': 20,
     'beta': None,
     'gamma': None,
     'delta': None,
@@ -41,7 +41,7 @@ par =  {
 
 beta_r = [0.25, 0.50, 0.75]     # accuracy
 gamma_r  = [0.25, 0.50, 0.75]   # disagreement
-delta_r = [0.05, 0.1]       # noise
+delta_r = [0.01, 0.05]       # noise
 
 
 # In[ ]:
@@ -82,10 +82,10 @@ for dataset in datasets:
     sub_groups_X = np.array_split(np.array(X), k_cross)
     sub_groups_y = np.array_split(np.array(y), k_cross) 
 
-    for beta, gamma, delta, epsilon in greeks_permutations:
+    for beta, gamma, delta in greeks_permutations:
         for k in range(k_cross):
             for rep in range(reps):
-                print(f"[Dataset: {dataset}, K: {k+1}/{k_cross}, Rep: {rep+1}/{reps}, Beta: {beta}, Gamma: {gamma}, Delta: {delta}, Epsilon: {epsilon}]")
+                print(f"[Dataset: {dataset}, K: {k+1}/{k_cross}, Rep: {rep+1}/{reps}, Beta: {beta}, Gamma: {gamma}, Delta: {delta}]")
 
                 if k_cross == 1:
                     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=seed)
@@ -98,17 +98,17 @@ for dataset in datasets:
                 fits = []
                 accs = []
 
-                bagging_sa, fitness, metrics = evaluate_bagging_sa(X_train, y_train, X_test, y_test, par, beta, gamma, delta, epsilon)
+                bagging_sa, fitness, metrics = evaluate_bagging_sa(X_train, y_train, X_test, y_test, par, beta, gamma, delta)
 
                 spearman_corr, spearman_p = spearmanr(fits, accs)
 
 
                 result.append([dataset, k+1, rep+1, 
-                               bagging_sa.beta, bagging_sa.gamma, bagging_sa.delta, bagging_sa.epsilon,
+                               bagging_sa.beta, bagging_sa.gamma, bagging_sa.delta,
                                fitness, spearman_corr, spearman_p, metrics['accuracy'], metrics['precision'], metrics['recall'], metrics['f1']])
 
                 df = pd.DataFrame(result, columns=['dataset', 'fold', 'rep', 
-                                                   'beta', 'gamma', 'delta', 'epsilon',
+                                                   'beta', 'gamma', 'delta',
                                                    'fitness', 'spearman_corr', 'spearman_p',
                                                    'accuracy', 'precision', 'recall', 'f1'])
 
