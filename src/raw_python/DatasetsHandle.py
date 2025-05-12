@@ -7,7 +7,7 @@ from sklearn.discriminant_analysis import StandardScaler
 from sklearn.impute import SimpleImputer
 
 
-def get_dataset(dataset_name: Literal['digits', 'wine', 'breast_cancer', 'pima', 'users_vs_bots', 'students_dropout']) -> Tuple[np.ndarray, np.ndarray]:
+def get_dataset(dataset_name: Literal['digits', 'wine', 'breast_cancer', 'pima', 'users_vs_bots', 'students_dropout', 'obesity']) -> Tuple[np.ndarray, np.ndarray]:
     if dataset_name == 'digits':
         data = sklearn.datasets.load_digits()
         X = data.data
@@ -49,6 +49,17 @@ def get_dataset(dataset_name: Literal['digits', 'wine', 'breast_cancer', 'pima',
         sc = StandardScaler()
         X = sc.fit_transform(X)
         y = ds.iloc[:,-1].values
+        
+    elif dataset_name == 'obesity':
+        df = pd.read_csv("./../datasets/obesity.csv")
+        y_tmp = df["NObeyesdad"]
+        X_tmp = df.drop("NObeyesdad", axis=1)
+        X_encoded = X_tmp.copy()
+        for col in X_encoded.select_dtypes(include=['object']).columns:
+            X_encoded[col] = LabelEncoder().fit_transform(X_encoded[col])
+        y_encoded = LabelEncoder().fit_transform(y_tmp)
+        y = y_encoded
+        X = X_encoded.values        
     
     else:
         raise ValueError("Unsupported dataset")

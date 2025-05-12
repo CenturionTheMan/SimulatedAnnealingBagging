@@ -130,7 +130,7 @@ def predict(X: np.ndarray, models: List[BaggingModel]) -> np.ndarray:
     ]
     return np.array(final_predictions)
 
-def evaluate_stats(X, y, models: List[BaggingModel], average='weighted', return_arr:bool=False)-> pd.DataFrame:
+def evaluate_stats(X, y, models: List[BaggingModel], average='macro', return_arr:bool=False)-> pd.DataFrame:
     y_pred = predict(X, models)
     
     result = {
@@ -146,6 +146,10 @@ def evaluate_stats(X, y, models: List[BaggingModel], average='weighted', return_
     else:
         return result
     
+def evaluate_f1(X, y, models: List[BaggingModel], average='macro') -> float:
+    y_pred = predict(X, models)
+    f1 = f1_score(y, y_pred, average=average)
+    return f1
 
 def evaluate(X, y, models: List[BaggingModel]) -> float:
     predictions = predict(X, models)

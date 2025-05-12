@@ -25,36 +25,34 @@ random.seed(seed)
 k_cross = 4
 reps = 3
 
-datasets = ['digits','wine', 'breast_cancer', 'pima']
+datasets = ['digits','wine', 'breast_cancer', 'pima', 'obesity', 'students_dropout']
 par =  {
     'T0': 2,
     'cooling_method': 'geometric',
     'alpha': 0.995,
     'max_iterations': 2000,
     'feature_mutation_chance': 0.25,
-    'test_split_amount': 5,
+    'validation_split_amount': 5,
     'n_trees': 10,
     'beta': None,
     'gamma': None,
     'delta': None,
-    'epsilon': None
 }
 
 beta_r = [0.25, 0.50, 0.75]     # accuracy
 gamma_r  = [0.25, 0.50, 0.75]   # disagreement
-delta_r = [0.01, 0.05, 0.1]       # noise
-epsilon_r = [0.1, 0.2]            # complexity
+delta_r = [0.05, 0.1]       # noise
 
 
 # In[ ]:
 
 
-def evaluate_bagging_sa(X_train, y_train, X_test, y_test, params, beta, gamma, delta, epsilon):
+def evaluate_bagging_sa(X_train, y_train, X_test, y_test, params, beta, gamma, delta):
     bagging_sa = BaggingSA(X=X_train, y=y_train, T0=params['T0'], alpha=params['alpha'], 
                            cooling_method=params['cooling_method'], max_iterations=params['max_iterations'],
                            n_trees=params['n_trees'], feature_mutation_chance=params['feature_mutation_chance'],
-                            test_split_amount=params['test_split_amount'],
-                            beta=beta, gamma=gamma, delta=delta, epsilon=epsilon)
+                            validation_split_amount=params['validation_split_amount'],
+                            beta=beta, gamma=gamma, delta=delta)
     models, fitness = bagging_sa.run(monitor_fun=fun_monitor, get_fitness=True, X_for_test=X_test, y_for_test=y_test)
     metrics = evaluate_stats(X=X_test, y=y_test, models=models)
     return bagging_sa, fitness, metrics
@@ -70,7 +68,7 @@ fits = []
 accs = []
 result = []
 
-greeks_permutations = list(product(beta_r, gamma_r, delta_r, epsilon_r))
+greeks_permutations = list(product(beta_r, gamma_r, delta_r))
 print(f"Start at {pd.Timestamp.now()}")
 for dataset in datasets:
     result = []

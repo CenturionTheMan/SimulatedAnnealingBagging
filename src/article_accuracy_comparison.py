@@ -16,7 +16,7 @@ from raw_python.Bagging import create_models, create_bags, evaluate, evaluate_st
 k_cross = 5
 reps = 5
 n_trees_arr = [10, 20, 30, 40, 50]
-datasets = ['digits', 'wine', 'breast_cancer', 'pima']
+datasets = ['digits', 'wine', 'breast_cancer', 'pima', 'obesity', 'students_dropout']
 
 bagging_sa_params = {
     'wine' : {
@@ -25,11 +25,10 @@ bagging_sa_params = {
         'alpha': 0.995,
         'max_iterations': 2000,
         'feature_mutation_chance': 0.25,
-        'test_split_amount': 5,
+        'validation_split_amount': 5,
         'beta': 0.75,
         'gamma': 0.25,
         'delta': 0.1,
-        'epsilon': 0.05
     },
     'breast_cancer' : {
         'T0': 2,
@@ -37,11 +36,10 @@ bagging_sa_params = {
         'alpha': 0.995,
         'max_iterations': 2000,
         'feature_mutation_chance': 0.25,
-        'test_split_amount': 5,
+        'validation_split_amount': 5,
         'beta': 0.75,
         'gamma': 0.25,
         'delta': 0.1,
-        'epsilon': 0.05   
     },
     'pima' : {
         'T0': 2,
@@ -49,11 +47,10 @@ bagging_sa_params = {
         'alpha': 0.995,
         'max_iterations': 2000,
         'feature_mutation_chance': 0.25,
-        'test_split_amount': 5,
+        'validation_split_amount': 5,
         'beta': 0.75,
         'gamma': 0.25,
         'delta': 0.1,
-        'epsilon': 0.05  
     },
     'digits' : {
         'T0': 2,
@@ -61,11 +58,10 @@ bagging_sa_params = {
         'alpha': 0.995,
         'max_iterations': 2000,
         'feature_mutation_chance': 0.25,
-        'test_split_amount': 5,
+        'validation_split_amount': 5,
         'beta': 0.75,
         'gamma': 0.25,
         'delta': 0.1,
-        'epsilon': 0.05     
     }
 }
 
@@ -80,15 +76,14 @@ def evaluate_bagging_sa(X_train, y_train, X_test, y_test, n_trees: int, params: 
     alpha = params['alpha']
     max_iterations = params['max_iterations']
     feature_mutation_chance = params['feature_mutation_chance']
-    test_split_amount = params['test_split_amount']
+    validation_split_amount = params['validation_split_amount']
     beta = params['beta']
     gamma = params['gamma']
     delta = params['delta']
-    epsilon = params['epsilon']
     bagging_sa = BaggingSA(X=X_train, y=y_train,
                             T0=T0, cooling_method=cooling_method, alpha=alpha, max_iterations=max_iterations, n_trees=n_trees,
-                            feature_mutation_chance=feature_mutation_chance, test_split_amount=test_split_amount,
-                            beta=beta, gamma=gamma, delta=delta, epsilon=epsilon)
+                            feature_mutation_chance=feature_mutation_chance, validation_split_amount=validation_split_amount,
+                            beta=beta, gamma=gamma, delta=delta)
     models = bagging_sa.run()
     metrics = evaluate_stats(X=X_test, y=y_test, models=models)
     return metrics

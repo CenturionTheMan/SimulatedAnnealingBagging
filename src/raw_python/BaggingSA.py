@@ -1,7 +1,7 @@
 from copy import deepcopy
 import math
 from typing import List, Literal, Tuple
-from raw_python.Bagging import Bag, BaggingModel, compute_disagreement, create_models, create_bags, evaluate, predict, q_statistic_for_ensemble
+from raw_python.Bagging import Bag, BaggingModel, compute_disagreement, create_models, create_bags, evaluate, evaluate_f1, predict, q_statistic_for_ensemble
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 from sklearn import datasets
@@ -28,14 +28,14 @@ class BaggingSA:
     def __init__(self, 
                  X: np.ndarray, y: np.ndarray,
                  T0: float, alpha: float, cooling_method: Literal['linear', 'geometric', 'logarithmic'], max_iterations: int, n_trees: int,
-                 feature_mutation_chance: float, test_split_amount: int,
-                 beta: float, gamma: float, delta: float, epsilon: float
+                 feature_mutation_chance: float, validation_split_amount: int,
+                 beta: float, gamma: float, delta: float
                  ):
         self.T0 = T0
         self.n_trees = n_trees
         self.max_iterations = max_iterations
         self.feature_mutation_chance = feature_mutation_chance
-        self.test_split_amount = test_split_amount
+        self.validation_split_amount = validation_split_amount
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=True, stratify=y)
         self.X_train = X_train
         self.y_train = y_train
@@ -47,7 +47,6 @@ class BaggingSA:
         self.beta = beta
         self.gamma = gamma
         self.delta = delta
-        self.epsilon = epsilon
 
     def get_validate_sets(self):
         random.shuffle(self.rows_validate)
@@ -57,23 +56,25 @@ class BaggingSA:
         y_test = np.array(y_test)
         y_test_noise = np.where(np.random.rand(len(y_test)) < self.delta, np.random.choice(self.classes, len(y_test)), y_test)
         
-        if self.test_split_amount <= 1:
+        if self.validation_split_amount <= 1:
             return np.array([X_test]), np.array([y_test_noise])
         
-        sub_groups_X_test = np.array_split(np.array(X_test), self.test_split_amount)
-        sub_groups_y_test = np.array_split(np.array(y_test_noise), self.test_split_amount)
+        sub_groups_X_test = np.array_split(np.array(X_test), self.validation_split_amount)
+        sub_groups_y_test = np.array_split(np.array(y_test_noise), self.validation_split_amount)
         return sub_groups_X_test, sub_groups_y_test
         
     def calculate_fitness(self, models: List[BaggingModel]) -> float:
         if self.beta > 0:        
             sub_groups_X_test, sub_groups_y_test = self.get_validate_sets()
-            accuracies = [
-                evaluate(X=sub_groups_X_test[i], y=sub_groups_y_test[i], models=models)
-                for i in range(self.test_split_amount)
+            evals = [
+                evaluate_f1(X=sub_groups_X_test[i], y=sub_groups_y_test[i], models=models)
+                for i in range(self.validation_split_amount)
             ]
-            accuracy = np.mean(accuracies)
+            eval_score = np.mean(evals)
         else:
-            accuracy = 0
+            eval_score = 0
+        
+        
         
         if self.gamma > 0:
             X_test, _ = zip(*self.rows_validate)
@@ -81,21 +82,12 @@ class BaggingSA:
         else:
             disagreement = 0
 
-        if self.epsilon > 0:
-            complexities = np.array([
-                0.3 * min(len(m.bag.features), self.features_amount) / max(len(m.bag.features), self.features_amount) +
-                0.7 * min(m.bag.count_samples(), len(self.X_train)) / max(m.bag.count_samples(), len(self.X_train))
-                for m in models
-            ])
-            complexity = 1 - complexities.mean()
-        else:
-            complexity = 0
+
         
-        accuracy = accuracy * self.beta
+        eval_score = eval_score * self.beta
         disagreement = disagreement* self.gamma
-        complexity = complexity* self.epsilon
         
-        fitness = accuracy + disagreement - complexity
+        fitness = eval_score + disagreement
         
         #print(f"   Acc: {accuracy:.4f}, Dis: {disagreement:.4f}, Com: {complexity:.4f} => Fit: {fitness:.4f}")
         
@@ -151,10 +143,17 @@ class BaggingSA:
         return bags
 
     def get_initial_population(self) -> Tuple[List[Bag], List[BaggingModel], float]:
-        tmp_bags = create_bags(self.X_train, self.y_train, self.n_trees)
-        tmp_models = create_models(tmp_bags)     
-        tmp_fit = self.calculate_fitness(tmp_models)
-        return tmp_bags, tmp_models, tmp_fit   
+        pop_size = 20
+        
+        tmp_bags = [create_bags(self.X_train, self.y_train, pop_size) for _ in range(pop_size)]
+        tmp_models = [create_models(bag) for bag in tmp_bags]
+        tmp_fits = [self.calculate_fitness(models) for models in tmp_models]
+        
+        best_fit = max(tmp_fits)
+        best_bags = tmp_bags[np.argmax(tmp_fits)]
+        best_models = tmp_models[np.argmax(tmp_fits)]
+        
+        return best_bags, best_models, best_fit
 
     def calculate_probability(self, newFitness: float, oldFitness: float, temperature: float) -> float:
         diff = newFitness - oldFitness
@@ -175,10 +174,16 @@ class BaggingSA:
             raise ValueError("Invalid temperature calculation method.")
         
     
-    def run(self, X_for_test = None, y_for_test = None, monitor_fun = None, get_fitness = False) -> List[BaggingModel]:
+    def run(self, X_for_test = None, y_for_test = None, monitor_fun = None, get_fitness = False, initial_bags: List[Bag]|None=None) -> List[BaggingModel]:
         T = self.T0
         
-        bags, models, fitness = self.get_initial_population()
+        if initial_bags is None:
+            bags, models, fitness = self.get_initial_population()
+        else:
+            bags = initial_bags.copy()
+            models = create_models(bags)
+            fitness = self.calculate_fitness(models)
+            
         
         best_models = models.copy()
         best_fitness = fitness
