@@ -65,9 +65,9 @@ class BaggingSA:
         
     def calculate_fitness(self, models: List[BaggingModel]) -> float:
         if self.beta > 0:        
-            sub_groups_X_test, sub_groups_y_test = self.get_validate_sets()
+            sub_groups_X_valid, sub_groups_y_valid = self.get_validate_sets()
             evals = [
-                evaluate_f1(X=sub_groups_X_test[i], y=sub_groups_y_test[i], models=models)
+                evaluate_f1(X=sub_groups_X_valid[i], y=sub_groups_y_valid[i], models=models)
                 for i in range(self.validation_split_amount)
             ]
             eval_score = np.mean(evals)
@@ -77,19 +77,14 @@ class BaggingSA:
         
         
         if self.gamma > 0:
-            X_test, _ = zip(*self.rows_validate)
-            disagreement = compute_disagreement(X=np.array(X_test), models=models)
+            X_valid, _ = zip(*self.rows_validate)
+            disagreement = compute_disagreement(X=np.array(X_valid), models=models)
         else:
             disagreement = 0
 
-
-        
         eval_score = eval_score * self.beta
         disagreement = disagreement* self.gamma
-        
         fitness = eval_score + disagreement
-        
-        #print(f"   Acc: {accuracy:.4f}, Dis: {disagreement:.4f}, Com: {complexity:.4f} => Fit: {fitness:.4f}")
         
         return fitness
     
