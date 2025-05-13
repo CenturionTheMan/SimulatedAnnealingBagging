@@ -1,2 +1,2 @@
 nTrees,BaggingNormality,SANormality,VarianceTest,ComparisonTest,Result
-10,Shapiro: 0.469,Shapiro: 0.004,Levene (median): 0.817,Mann-Whitney: 0.198,H0 accepted
+10,Shapiro: 0.469,Shapiro: 0.004,Levene (median): 0.817,Mann-Whitney: 0.099,H0 accepted
