@@ -19,17 +19,6 @@ n_trees_arr = [10, 20, 30, 40, 50]
 datasets = ['digits', 'wine', 'breast_cancer', 'pima', 'obesity', 'students_dropout']
 
 bagging_sa_params = {
-    'wine' : {
-        'T0': 2,
-        'cooling_method': 'geometric',
-        'alpha': 0.995,
-        'max_iterations': 2000,
-        'feature_mutation_chance': 0.25,
-        'validation_split_amount': 5,
-        'beta': 0.75,
-        'gamma': 0.50,
-        'delta': 0.01,
-    },
     'breast_cancer' : {
         'T0': 2,
         'cooling_method': 'geometric',
@@ -38,18 +27,7 @@ bagging_sa_params = {
         'feature_mutation_chance': 0.25,
         'validation_split_amount': 5,
         'beta': 0.5,
-        'gamma': 0.75,
-        'delta': 0.05,
-    },
-    'pima' : {
-        'T0': 2,
-        'cooling_method': 'geometric',
-        'alpha': 0.995,
-        'max_iterations': 2000,
-        'feature_mutation_chance': 0.25,
-        'validation_split_amount': 5,
-        'beta': 0.75,
-        'gamma': 0.25,
+        'gamma': 0.5,
         'delta': 0.01,
     },
     'digits' : {
@@ -61,7 +39,7 @@ bagging_sa_params = {
         'validation_split_amount': 5,
         'beta': 0.75,
         'gamma': 0.25,
-        'delta': 0.05,
+        'delta': 0.01,
     },
     'obesity' : {
         'T0': 2,
@@ -74,7 +52,7 @@ bagging_sa_params = {
         'gamma': 0.25,
         'delta': 0.05,
     },
-    'students_dropout' : {
+    'pima' : {
         'T0': 2,
         'cooling_method': 'geometric',
         'alpha': 0.995,
@@ -84,6 +62,28 @@ bagging_sa_params = {
         'beta': 0.75,
         'gamma': 0.25,
         'delta': 0.05,
+    },
+     'students_dropout' : {
+        'T0': 2,
+        'cooling_method': 'geometric',
+        'alpha': 0.995,
+        'max_iterations': 2000,
+        'feature_mutation_chance': 0.25,
+        'validation_split_amount': 5,
+        'beta': 0.75,
+        'gamma': 0.5,
+        'delta': 0.05,
+    },
+    'wine' : {
+        'T0': 2,
+        'cooling_method': 'geometric',
+        'alpha': 0.995,
+        'max_iterations': 2000,
+        'feature_mutation_chance': 0.25,
+        'validation_split_amount': 5,
+        'beta': 0.75,
+        'gamma': 0.25,
+        'delta': 0.01,
     },
 }
 
