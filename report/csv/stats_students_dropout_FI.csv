@@ -3,4 +3,4 @@ nTrees,BaggingNormality,SANormality,VarianceTest,ComparisonTest,Result
 20,Shapiro: 0.042,Shapiro: 0.046,Levene (median): 0.958,Mann-Whitney: 0.993,H0 accepted
 30,Shapiro: 0.024,Shapiro: 0.764,Levene (median): 0.398,Mann-Whitney: 1.000,H0 accepted
 40,Shapiro: 0.000,Shapiro: 0.698,Levene (median): 0.488,Mann-Whitney: 1.000,H0 accepted
-50,Shapiro: 0.173,Shapiro: 0.802,Levene (mean): 0.830,T-test (equal var): 0.695,H0 accepted
+50,Shapiro: 0.050,Shapiro: 0.417,Levene (mean): 0.172,T-test (equal var): 0.999,H0 accepted
